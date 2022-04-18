@@ -24,12 +24,11 @@ from airflow import DAG
 from airflow.api_connexion.exceptions import EXCEPTIONS_LINK_MAP
 from airflow.models.baseoperator import BaseOperatorLink
 from airflow.models.dagbag import DagBag
-from airflow.models.dagrun import DagRun
 from airflow.models.xcom import XCom
 from airflow.plugins_manager import AirflowPlugin
 from airflow.providers.google.cloud.operators.bigquery import BigQueryExecuteQueryOperator
 from airflow.security import permissions
-from airflow.utils.dates import days_ago
+from airflow.utils.state import DagRunState
 from airflow.utils.timezone import datetime
 from airflow.utils.types import DagRunType
 from tests.test_utils.api_connexion_utils import create_user, delete_user
@@ -72,17 +71,17 @@ class TestGetExtraLinks:
         self.dag = self._create_dag()
 
         self.app.dag_bag = DagBag(os.devnull, include_examples=False)
-        self.app.dag_bag.dags = {self.dag.dag_id: self.dag}  # type: ignore  # pylint: disable=no-member
-        self.app.dag_bag.sync_to_db()  # type: ignore  # pylint: disable=no-member
+        self.app.dag_bag.dags = {self.dag.dag_id: self.dag}  # type: ignore
+        self.app.dag_bag.sync_to_db()  # type: ignore
 
-        dr = DagRun(
-            dag_id=self.dag.dag_id,
+        self.dag.create_dagrun(
             run_id="TEST_DAG_RUN_ID",
             execution_date=self.default_time,
             run_type=DagRunType.MANUAL,
+            state=DagRunState.SUCCESS,
+            session=session,
         )
-        session.add(dr)
-        session.commit()
+        session.flush()
 
         self.client = self.app.test_client()  # type:ignore
 
@@ -90,12 +89,11 @@ class TestGetExtraLinks:
         clear_db_runs()
         clear_db_xcom()
 
-    @staticmethod
-    def _create_dag():
+    def _create_dag(self):
         with DAG(
             dag_id="TEST_DAG_ID",
             default_args=dict(
-                start_date=days_ago(2),
+                start_date=self.default_time,
             ),
         ) as dag:
             BigQueryExecuteQueryOperator(task_id="TEST_SINGLE_QUERY", sql="SELECT 1")
@@ -214,10 +212,9 @@ class TestGetExtraLinks:
             operators = [BigQueryExecuteQueryOperator]
 
             def get_link(self, operator, dttm):
-                return "https://s3.amazonaws.com/airflow-logs/{dag_id}/{task_id}/{execution_date}".format(
-                    dag_id=operator.dag_id,
-                    task_id=operator.task_id,
-                    execution_date=quote_plus(dttm.isoformat()),
+                return (
+                    f"https://s3.amazonaws.com/airflow-logs/{operator.dag_id}/"
+                    f"{operator.task_id}/{quote_plus(dttm.isoformat())}"
                 )
 
         class AirflowTestPlugin(AirflowPlugin):

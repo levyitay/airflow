@@ -19,8 +19,6 @@
 Community Providers
 ===================
 
-.. contents:: :local:
-
 How-to creating a new community provider
 ----------------------------------------
 
@@ -32,9 +30,9 @@ new provider.
 Another recommendation that will help you is to look for a provider that works similar to yours. That way it will
 help you to set up tests and other dependencies.
 
-First, you need to set up your local development environment. See `Contribution Quick Start <https://github.com/apache/airflow/blob/master/CONTRIBUTING.rst>`_
+First, you need to set up your local development environment. See `Contribution Quick Start <https://github.com/apache/airflow/blob/main/CONTRIBUTING.rst>`_
 if you did not set up your local environment yet. We recommend using ``breeze`` to develop locally. This way you
-easily be able to have an environment more similar to the one executed by Github CI workflow.
+easily be able to have an environment more similar to the one executed by GitHub CI workflow.
 
   .. code-block:: bash
 
@@ -55,7 +53,7 @@ Most likely you have developed a version of the provider using some local custom
 transfer this code to the Airflow project. Below is described all the initial code structure that
 the provider may need. Understand that not all providers will need all the components described in this structure.
 If you still have doubts about building your provider, we recommend that you read the initial provider guide and
-open a issue on Github so the community can help you.
+open a issue on GitHub so the community can help you.
 
   .. code-block:: bash
 
@@ -124,14 +122,14 @@ Add your provider information in the following variables in ``test_providers_man
 Integration tests
 ^^^^^^^^^^^^^^^^^
 
-See `Airflow Integration Tests <https://github.com/apache/airflow/blob/master/TESTING.rst#airflow-integration-tests>`_
+See `Airflow Integration Tests <https://github.com/apache/airflow/blob/main/TESTING.rst#airflow-integration-tests>`_
 
 
 Documentation
 ^^^^^^^^^^^^^
 
 An important part of building a new provider is the documentation.
-Some steps for documentation occurs automatically by ``pre-commit`` see `Installing pre-commit guide <https://github.com/apache/airflow/blob/master/CONTRIBUTORS_QUICK_START.rst#pre-commit>`_
+Some steps for documentation occurs automatically by ``pre-commit`` see `Installing pre-commit guide <https://github.com/apache/airflow/blob/main/CONTRIBUTORS_QUICK_START.rst#pre-commit>`_
 
   .. code-block:: bash
 
@@ -196,15 +194,15 @@ any dependency add a empty list.
   .. code-block:: python
 
       PROVIDERS_REQUIREMENTS: Dict[str, List[str]] = {
-          ...
-          'microsoft.winrm': winrm,
-          'mongo': mongo,
-          'mysql': mysql,
-          'neo4j': neo4j,
-          '<NEW_PROVIDER>': [],
-          'odbc': odbc,
-          ...
-          }
+          # ...
+          "microsoft.winrm": winrm,
+          "mongo": mongo,
+          "mysql": mysql,
+          "neo4j": neo4j,
+          "<NEW_PROVIDER>": [],
+          "odbc": odbc,
+          # ...
+      }
 
 In the ``CONTRIBUTING.rst`` adds:
 
@@ -279,11 +277,22 @@ In the ``airflow/providers/<NEW_PROVIDER>/provider.yaml`` add information of you
           python-modules:
             - airflow.providers.<NEW_PROVIDER>.sensors.<NEW_PROVIDER>
 
-      hook-class-names:
+      connection-types:
+        - hook-class-name: airflow.providers.<NEW_PROVIDER>.hooks.<NEW_PROVIDER>.NewProviderHook
+        - connection-type: provider-connection-type
+
+      hook-class-names:  # deprecated in Airflow 2.2.0
         - airflow.providers.<NEW_PROVIDER>.hooks.<NEW_PROVIDER>.NewProviderHook
 
-You only need to add ``hook-class-names`` in case you have some hooks that have customized UI behavior.
-For more information see `Custom connection types <http://airflow.apache.org/docs/apache-airflow/stable/howto/connection.html#custom-connection-types>`_
+.. note:: Defining your own connection types
+
+    You only need to add ``connection-types`` in case you have some hooks that have customized UI behavior. However
+    it is only supported for Airflow 2.2.0. If your providers are also targeting Airflow below 2.2.0 you should
+    provide the deprecated ``hook-class-names`` array. The ``connection-types`` array allows for optimization
+    of importing of individual connections and while Airflow 2.2.0 is able to handle both definition, the
+    ``connection-types`` is recommended.
+
+    For more information see `Custom connection types <http://airflow.apache.org/docs/apache-airflow/stable/howto/connection.html#custom-connection-types>`_
 
 
 After changing and creating these files you can build the documentation locally. The two commands below will
@@ -295,7 +304,132 @@ main Airflow documentation that involves some steps with the providers is also w
     ./breeze build-docs -- --package-filter apache-airflow-providers-<NEW_PROVIDER>
     ./breeze build-docs -- --package-filter apache-airflow
 
+Optional provider features
+--------------------------
+
+  .. note::
+
+    This feature is available in Airflow 2.3+.
+
+Some providers might provide optional features, which are only available when some packages or libraries
+are installed. Such features will typically result in ``ImportErrors`` however those import errors
+should be silently ignored rather than pollute the logs of Airflow with false warnings. False warnings
+are a very bad pattern, as they tend to turn into blind spots, so avoiding false warnings is encouraged.
+However until Airflow 2.3, Airflow had no mechanism to selectively ignore "known" ImportErrors. So
+Airflow 2.1 and 2.2 silently ignored all ImportErrors coming from providers with actually lead to
+ignoring even important import errors - without giving the clue to Airflow users that there is something
+missing in provider dependencies.
+
+In Airflow 2.3, new exception :class:`~airflow.exceptions.OptionalProviderFeatureException` has been
+introduced and Providers can use the exception to signal that the ImportError (or any other error) should
+be ignored by Airflow ProvidersManager. However this Exception is only available in Airflow 2.3 so if
+providers would like to remain compatible with Airflow 2.1 and 2.2, they should continue throwing
+the ImportError exception.
+
+Example code (from Plyvel Hook, part of the Google Provider) explains how such conditional error handling
+should be implemented to keep compatibility with Airflow 2.1 and 2.2
+
+  .. code-block:: python
+
+    try:
+        import plyvel
+        from plyvel import DB
+
+        from airflow.exceptions import AirflowException
+        from airflow.hooks.base import BaseHook
+
+    except ImportError as e:
+        # Plyvel is an optional feature and if imports are missing, it should be silently ignored
+        # As of Airflow 2.3  and above the operator can throw OptionalProviderFeatureException
+        try:
+            from airflow.exceptions import AirflowOptionalProviderFeatureException
+        except ImportError:
+            # However, in order to keep backwards-compatibility with Airflow 2.1 and 2.2, if the
+            # 2.3 exception cannot be imported, the original ImportError should be raised.
+            # This try/except can be removed when the provider depends on Airflow >= 2.3.0
+            raise e
+        raise AirflowOptionalProviderFeatureException(e)
+
+
+Using Providers with dynamic task mapping
+-----------------------------------------
+
+Airflow 2.3 added `Dynamic Task Mapping <https://cwiki.apache.org/confluence/display/AIRFLOW/AIP-42+Dynamic+Task+Mapping>`_
+and it added the possibility of assigning a unique key to each task. Which means that when such dynamically
+mapped task wants to retrieve a value from XCom (for example in case an extra link should calculated)
+it should always check if the ti_key value passed is not None an only then retrieve the XCom value using
+XCom.get_value. This allows to keep backwards compatibility with earlier versions of Airflow.
+
+Typical code to access XCom Value in providers that want to keep backwards compatibility should look similar to
+this (note the ``if ti_key is not None:`` condition).
+
+  .. code-block:: python
+
+    def get_link(
+        self,
+        operator,
+        dttm: Optional[datetime] = None,
+        ti_key: Optional["TaskInstanceKey"] = None,
+    ):
+        if ti_key is not None:
+            job_ids = XCom.get_value(key="job_id", ti_key=ti_key)
+        else:
+            assert dttm is not None
+            job_ids = XCom.get_one(
+                key="job_id",
+                dag_id=operator.dag.dag_id,
+                task_id=operator.task_id,
+                execution_date=dttm,
+            )
+        if not job_ids:
+            return None
+        if len(job_ids) < self.index:
+            return None
+        job_id = job_ids[self.index]
+        return BIGQUERY_JOB_DETAILS_LINK_FMT.format(job_id=job_id)
+
+
+Having sensors return XOM values
+--------------------------------
+In Airflow 2.3, sensor operators will be able to return XCOM values. This is achieved by returning an instance of the ``PokeReturnValue`` object at the end of the ``poke()`` method:
+
+  .. code-block:: python
+
+    from airflow.sensors.base import PokeReturnValue
+
+
+    class SensorWithXcomValue(BaseSensorOperator):
+        def poke(self, context: Context) -> Union[bool, PokeReturnValue]:
+            # ...
+            is_done = ...  # set to true if the sensor should stop poking.
+            xcom_value = ...  # return value of the sensor operator to be pushed to XCOM.
+            return PokeReturnValue(is_done, xcom_value)
+
+
+To implement a sensor operator that pushes a XCOM value and supports both version 2.3 and pre-2.3, you need to explicitly push the XCOM value if the version is pre-2.3.
+
+  .. code-block:: python
+
+    try:
+        from airflow.sensors.base import PokeReturnValue
+    except ImportError:
+        PokeReturnValue = None
+
+
+    class SensorWithXcomValue(BaseSensorOperator):
+        def poke(self, context: Context) -> bool:
+            # ...
+            is_done = ...  # set to true if the sensor should stop poking.
+            xcom_value = ...  # return value of the sensor operator to be pushed to XCOM.
+            if PokeReturnValue is not None:
+                return PokeReturnValue(is_done, xcom_value)
+            else:
+                if is_done:
+                    context["ti"].xcom_push(key="xcom_key", value=xcom_value)
+                return is_done
+
+
 How-to Update a community provider
 ----------------------------------
 
-See `Provider packages versioning <https://github.com/apache/airflow/blob/master/dev/README_RELEASE_PROVIDER_PACKAGES.md#provider-packages-versioning>`_
+See `Provider packages versioning <https://github.com/apache/airflow/blob/main/dev/README_RELEASE_PROVIDER_PACKAGES.md#provider-packages-versioning>`_

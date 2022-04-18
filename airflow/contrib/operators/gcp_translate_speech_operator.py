@@ -22,8 +22,7 @@ Please use :mod:`airflow.providers.google.cloud.operators.translate_speech`.
 
 import warnings
 
-# pylint: disable=unused-import
-from airflow.providers.google.cloud.operators.translate_speech import CloudTranslateSpeechOperator  # noqa
+from airflow.providers.google.cloud.operators.translate_speech import CloudTranslateSpeechOperator
 
 warnings.warn(
     "This module is deprecated. Please use `airflow.providers.google.cloud.operators.translate_speech`.",
@@ -45,6 +44,6 @@ class GcpTranslateSpeechOperator(CloudTranslateSpeechOperator):
             `airflow.providers.google.cloud.operators.translate_speech.CloudTranslateSpeechOperator`.
             """,
             DeprecationWarning,
-            stacklevel=3,
+            stacklevel=2,
         )
         super().__init__(*args, **kwargs)

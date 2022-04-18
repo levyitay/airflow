@@ -25,6 +25,7 @@ export PRINT_INFO_FROM_SCRIPTS
 
 DOCKER_COMPOSE_LOCAL=()
 INTEGRATIONS=()
+INTEGRATION_BREEZE_FLAGS=()
 
 function prepare_tests() {
     DOCKER_COMPOSE_LOCAL+=("-f" "${SCRIPTS_CI_DIR}/docker-compose/files.yml")
@@ -51,16 +52,16 @@ function prepare_tests() {
 
     if [[ ${TEST_TYPE:=} == "Integration" ]]; then
         export ENABLED_INTEGRATIONS="${AVAILABLE_INTEGRATIONS}"
-        export RUN_INTEGRATION_TESTS="${AVAILABLE_INTEGRATIONS}"
+        export LIST_OF_INTEGRATION_TESTS_TO_RUN="${AVAILABLE_INTEGRATIONS}"
     else
         export ENABLED_INTEGRATIONS=""
-        export RUN_INTEGRATION_TESTS=""
+        export LIST_OF_INTEGRATION_TESTS_TO_RUN=""
     fi
 
     for _INT in ${ENABLED_INTEGRATIONS}
     do
-        INTEGRATIONS+=("-f")
-        INTEGRATIONS+=("${SCRIPTS_CI_DIR}/docker-compose/integration-${_INT}.yml")
+        INTEGRATIONS+=("-f" "${SCRIPTS_CI_DIR}/docker-compose/integration-${_INT}.yml")
+        INTEGRATION_BREEZE_FLAGS+=("--integration" "${_INT}")
     done
 
     readonly INTEGRATIONS
@@ -72,6 +73,7 @@ function prepare_tests() {
     echo "**********************************************************************************************"
 }
 
+
 # Runs airflow testing in docker container
 # You need to set variable TEST_TYPE - test type to run
 # "${@}" - extra arguments to pass to docker command
@@ -82,40 +84,37 @@ function run_airflow_testing_in_docker() {
     echo
     echo "Semaphore grabbed. Running tests for ${TEST_TYPE}"
     echo
-    for try_num in {1..5}
-    do
-        echo
-        echo "Starting try number ${try_num}"
-        echo
-        echo
-        echo "Making sure docker-compose is down and remnants removed"
-        echo
-        docker-compose --log-level INFO -f "${SCRIPTS_CI_DIR}/docker-compose/base.yml" \
-            --project-name "airflow-${TEST_TYPE}-${BACKEND}" \
-            down --remove-orphans \
-            --volumes --timeout 10
-        docker-compose --log-level INFO \
-          -f "${SCRIPTS_CI_DIR}/docker-compose/base.yml" \
-          -f "${SCRIPTS_CI_DIR}/docker-compose/backend-${BACKEND}.yml" \
-          "${INTEGRATIONS[@]}" \
-          "${DOCKER_COMPOSE_LOCAL[@]}" \
-          --project-name "airflow-${TEST_TYPE}-${BACKEND}" \
-             run airflow "${@}"
-        exit_code=$?
-        docker-compose --log-level INFO -f "${SCRIPTS_CI_DIR}/docker-compose/base.yml" \
-            --project-name "airflow-${TEST_TYPE}-${BACKEND}" \
-            down --remove-orphans \
-            --volumes --timeout 10
-        if [[ ${exit_code} == "254" && ${try_num} != "5" ]]; then
-            echo
-            echo "Failed try num ${try_num}. Sleeping 5 seconds for retry"
-            echo
-            sleep 5
-            continue
-        else
-            break
-        fi
-    done
+
+    echo "Making sure docker-compose is down and remnants removed"
+    echo
+    docker-compose -f "${SCRIPTS_CI_DIR}/docker-compose/base.yml" \
+        "${INTEGRATIONS[@]}" \
+        --project-name "airflow-${TEST_TYPE}-${BACKEND}" \
+        down --remove-orphans \
+        --volumes --timeout 10
+    docker-compose --log-level INFO \
+      -f "${SCRIPTS_CI_DIR}/docker-compose/base.yml" \
+      "${BACKEND_DOCKER_COMPOSE[@]}" \
+      "${INTEGRATIONS[@]}" \
+      "${DOCKER_COMPOSE_LOCAL[@]}" \
+      --project-name "airflow-${TEST_TYPE}-${BACKEND}" \
+         run airflow "${@}"
+    exit_code=$?
+    docker ps
+    if [[ ${exit_code} != "0" && ${CI} == "true" ]]; then
+        docker ps --all
+        local container
+        for container in $(docker ps --all --format '{{.Names}}')
+        do
+            testing::dump_container_logs "${container}"
+        done
+    fi
+
+    docker-compose --log-level INFO -f "${SCRIPTS_CI_DIR}/docker-compose/base.yml" \
+        "${INTEGRATIONS[@]}" \
+        --project-name "airflow-${TEST_TYPE}-${BACKEND}" \
+        down --remove-orphans \
+        --volumes --timeout 10
     set -u
     set -e
     if [[ ${exit_code} != "0" ]]; then
@@ -132,42 +131,36 @@ function run_airflow_testing_in_docker() {
         echo "${COLOR_RED}*        See the above log for details.${COLOR_RESET}"
         echo "${COLOR_RED}*${COLOR_RESET}"
         echo "${COLOR_RED}***********************************************************************************************${COLOR_RESET}"
-        echo """
-*  You can easily reproduce the failed tests on your dev machine/
-*
-*   When you have the source branch checked out locally:
-*
-*     Run all tests:
-*
-*       ./breeze --backend ${BACKEND} ${EXTRA_ARGS}--python ${PYTHON_MAJOR_MINOR_VERSION} --db-reset --skip-mounting-local-sources --test-type ${TEST_TYPE} tests
-*
-*     Enter docker shell:
-*
-*       ./breeze --backend ${BACKEND} ${EXTRA_ARGS}--python ${PYTHON_MAJOR_MINOR_VERSION} --db-reset --skip-mounting-local-sources --test-type ${TEST_TYPE} shell
-*"""
-    if [[ -n "${GITHUB_REGISTRY_PULL_IMAGE_TAG=}" ]]; then
-        echo """
-*   When you do not have sources:
-*
-*     Run all tests:
-*
-*      ./breeze --github-image-id ${GITHUB_REGISTRY_PULL_IMAGE_TAG} --backend ${BACKEND} ${EXTRA_ARGS}--python ${PYTHON_MAJOR_MINOR_VERSION} --db-reset --skip-mounting-local-sources --test-type ${TEST_TYPE} tests
-*
-*     Enter docker shell:
-*
-*      ./breeze --github-image-id ${GITHUB_REGISTRY_PULL_IMAGE_TAG} --backend ${BACKEND} ${EXTRA_ARGS}--python ${PYTHON_MAJOR_MINOR_VERSION} --db-reset --skip-mounting-local-sources --test-type ${TEST_TYPE} shell
-*"""
-    fi
-    echo """
-*
-*   NOTE! Once you are in the docker shell, you can run failed test with:
-*
-*            pytest [TEST_NAME]
-*
-*   You can copy the test name from the output above
-*
-***********************************************************************************************"""
+        echo
+        echo "${COLOR_BLUE}***********************************************************************************************${COLOR_RESET}"
+        echo "${COLOR_BLUE}Reproduce the failed tests on your local machine (note that you need to use docker-compose v1 rather than v2 to enable Kerberos integration):${COLOR_RESET}"
+        echo "${COLOR_YELLOW}./breeze --github-image-id ${GITHUB_REGISTRY_PULL_IMAGE_TAG=} --backend ${BACKEND} ${EXTRA_ARGS}--python ${PYTHON_MAJOR_MINOR_VERSION} --db-reset --skip-mounting-local-sources --test-type ${TEST_TYPE} ${INTEGRATION_BREEZE_FLAGS[*]} shell${COLOR_RESET}"
+        echo "${COLOR_BLUE}Then you can run failed tests with:${COLOR_RESET}"
+        echo "${COLOR_YELLOW}pytest [TEST_NAME]${COLOR_RESET}"
+        echo "${COLOR_BLUE}***********************************************************************************************${COLOR_RESET}"
 
+
+        if [[ ${UPGRADE_TO_NEWER_DEPENDENCIES} != "false" ]]; then
+            local constraints_url="https://raw.githubusercontent.com/apache/airflow/${DEFAULT_CONSTRAINTS_BRANCH}/constraints-source-providers-${PYTHON_MAJOR_MINOR_VERSION}.txt"
+            echo "${COLOR_BLUE}***********************************************************************************************${COLOR_RESET}"
+            echo "${COLOR_BLUE}*${COLOR_RESET}"
+            echo "${COLOR_BLUE}* In case you see unrelated test failures, it can be due to newer dependencies released.${COLOR_RESET}"
+            echo "${COLOR_BLUE}* This is either because it is 'main' branch or because this PR modifies dependencies (setup.* files).${COLOR_RESET}"
+            echo "${COLOR_BLUE}* Therefore 'eager-upgrade' is used to build the image, This means that this build can have newer dependencies than the 'tested' set of constraints,${COLOR_RESET}"
+            echo "${COLOR_BLUE}*${COLOR_RESET}"
+            echo "${COLOR_BLUE}* The tested constraints for that build are available at: ${constraints_url} ${COLOR_RESET}"
+            echo "${COLOR_BLUE}*${COLOR_RESET}"
+            echo "${COLOR_BLUE}* Please double check if the same failure is in other tests and in 'main' branch and check if the dependency differences causes the problem.${COLOR_RESET}"
+            echo "${COLOR_BLUE}* In case you identify the dependency, either fix the root cause or limit the dependency if it is too difficult to fix.${COLOR_RESET}"
+            echo "${COLOR_BLUE}*${COLOR_RESET}"
+            echo "${COLOR_BLUE}* The diff between fixed constraints and those used in this build is below.${COLOR_RESET}"
+            echo "${COLOR_BLUE}*${COLOR_RESET}"
+            echo "${COLOR_BLUE}***********************************************************************************************${COLOR_RESET}"
+            echo
+            curl "${constraints_url}" | grep -ve "^#" | diff --color=always - <( docker run --entrypoint /bin/bash "${AIRFLOW_CI_IMAGE_WITH_TAG}"  -c 'pip freeze' \
+                | sort | grep -v "apache_airflow" | grep -v "@" | grep -v "/opt/airflow" | grep -ve "^#")
+            echo
+        fi
     fi
 
     echo ${exit_code} > "${PARALLEL_JOB_STATUS}"
@@ -175,15 +168,14 @@ function run_airflow_testing_in_docker() {
     if [[ ${exit_code} == 0 ]]; then
         echo
         echo "${COLOR_GREEN}Test type: ${TEST_TYPE} succeeded.${COLOR_RESET}"
-        echo
     else
         echo
         echo "${COLOR_RED}Test type: ${TEST_TYPE} failed.${COLOR_RESET}"
-        echo
     fi
     return "${exit_code}"
 }
 
 prepare_tests
 
+testing::setup_docker_compose_backend "${TEST_TYPE}"
 run_airflow_testing_in_docker "${@}"

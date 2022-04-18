@@ -15,35 +15,26 @@
 # specific language governing permissions and limitations
 # under the License.
 import warnings
-from typing import NamedTuple
-from unittest import mock
+from typing import Sequence
 
 import attr
 
-from airflow.models import TaskInstance
 from airflow.models.baseoperator import BaseOperator, BaseOperatorLink
-from airflow.providers.apache.hive.operators.hive import HiveOperator
-from airflow.utils.decorators import apply_defaults
-
-
-# Namedtuple for testing purposes
-class MockNamedTuple(NamedTuple):
-    var1: str
-    var2: str
+from airflow.models.xcom import XCom
+from airflow.utils.context import Context
 
 
 class MockOperator(BaseOperator):
     """Operator for testing purposes."""
 
-    template_fields = ("arg1", "arg2")
+    template_fields: Sequence[str] = ("arg1", "arg2")
 
-    @apply_defaults
     def __init__(self, arg1: str = "", arg2: str = "", **kwargs):
         super().__init__(**kwargs)
         self.arg1 = arg1
         self.arg2 = arg2
 
-    def execute(self, context):
+    def execute(self, context: Context):
         pass
 
 
@@ -54,8 +45,8 @@ class AirflowLink(BaseOperatorLink):
 
     name = 'airflow'
 
-    def get_link(self, operator, dttm):
-        return 'should_be_overridden'
+    def get_link(self, operator, *, ti_key):
+        return 'https://airflow.apache.org'
 
 
 class Dummy2TestOperator(BaseOperator):
@@ -84,9 +75,10 @@ class CustomBaseIndexOpLink(BaseOperatorLink):
     def name(self) -> str:
         return f'BigQuery Console #{self.index + 1}'
 
-    def get_link(self, operator, dttm):
-        ti = TaskInstance(task=operator, execution_date=dttm)
-        search_queries = ti.xcom_pull(task_ids=operator.task_id, key='search_query')
+    def get_link(self, operator, *, ti_key):
+        search_queries = XCom.get_one(
+            task_id=ti_key.task_id, dag_id=ti_key.dag_id, run_id=ti_key.run_id, key='search_query'
+        )
         if not search_queries:
             return None
         if len(search_queries) < self.index:
@@ -98,9 +90,10 @@ class CustomBaseIndexOpLink(BaseOperatorLink):
 class CustomOpLink(BaseOperatorLink):
     name = 'Google Custom'
 
-    def get_link(self, operator, dttm):
-        ti = TaskInstance(task=operator, execution_date=dttm)
-        search_query = ti.xcom_pull(task_ids=operator.task_id, key='search_query')
+    def get_link(self, operator, *, ti_key):
+        search_query = XCom.get_one(
+            task_id=ti_key.task_id, dag_id=ti_key.dag_id, run_id=ti_key.run_id, key='search_query'
+        )
         return f'http://google.com/custom_base_link?search={search_query}'
 
 
@@ -117,12 +110,11 @@ class CustomOperator(BaseOperator):
             return (CustomOpLink(),)
         return (CustomBaseIndexOpLink(i) for i, _ in enumerate(self.bash_command))
 
-    @apply_defaults
     def __init__(self, bash_command=None, **kwargs):
         super().__init__(**kwargs)
         self.bash_command = bash_command
 
-    def execute(self, context):
+    def execute(self, context: Context):
         self.log.info("Hello World!")
         context['task_instance'].xcom_push(key='search_query', value="dummy_value")
 
@@ -135,7 +127,7 @@ class GoogleLink(BaseOperatorLink):
     name = 'google'
     operators = [Dummy3TestOperator, CustomOperator]
 
-    def get_link(self, operator, dttm):
+    def get_link(self, operator, *, ti_key):
         return 'https://www.google.com'
 
 
@@ -147,7 +139,7 @@ class AirflowLink2(BaseOperatorLink):
     name = 'airflow'
     operators = [Dummy2TestOperator, Dummy3TestOperator]
 
-    def get_link(self, operator, dttm):
+    def get_link(self, operator, *, ti_key):
         return 'https://airflow.apache.org/1.10.5/'
 
 
@@ -158,21 +150,14 @@ class GithubLink(BaseOperatorLink):
 
     name = 'github'
 
-    def get_link(self, operator, dttm):
+    def get_link(self, operator, *, ti_key):
         return 'https://github.com/apache/airflow'
 
 
-class MockHiveOperator(HiveOperator):
-    def __init__(self, *args, **kwargs):
-        self.run = mock.MagicMock()
-        super().__init__(*args, **kwargs)
-
-
 class DeprecatedOperator(BaseOperator):
-    @apply_defaults
     def __init__(self, **kwargs):
-        warnings.warn("This operator is deprecated.", DeprecationWarning, stacklevel=4)
+        warnings.warn("This operator is deprecated.", DeprecationWarning, stacklevel=2)
         super().__init__(**kwargs)
 
-    def execute(self, context):
+    def execute(self, context: Context):
         pass

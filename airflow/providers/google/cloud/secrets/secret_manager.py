@@ -16,20 +16,28 @@
 # under the License.
 
 """Objects relating to sourcing connections from Google Cloud Secrets Manager"""
+import logging
+import re
+import warnings
 from typing import Optional
 
-try:
-    from functools import cached_property
-except ImportError:
-    from cached_property import cached_property
+from google.auth.exceptions import DefaultCredentialsError
 
 from airflow.exceptions import AirflowException
-from airflow.providers.google.cloud._internal_client.secret_manager_client import _SecretManagerClient  # noqa
+from airflow.providers.google.cloud._internal_client.secret_manager_client import _SecretManagerClient
 from airflow.providers.google.cloud.utils.credentials_provider import get_credentials_and_project_id
 from airflow.secrets import BaseSecretsBackend
 from airflow.utils.log.logging_mixin import LoggingMixin
+from airflow.version import version as airflow_version
+
+log = logging.getLogger(__name__)
 
 SECRET_ID_PATTERN = r"^[a-zA-Z0-9-_]*$"
+
+
+def _parse_version(val):
+    val = re.sub(r'(\d+\.\d+\.\d+).*', lambda x: x.group(1), val)
+    return tuple(int(x) for x in val.split('.'))
 
 
 class CloudSecretManagerBackend(BaseSecretsBackend, LoggingMixin):
@@ -56,26 +64,18 @@ class CloudSecretManagerBackend(BaseSecretsBackend, LoggingMixin):
 
     :param connections_prefix: Specifies the prefix of the secret to read to get Connections.
         If set to None (null), requests for connections will not be sent to GCP Secrets Manager
-    :type connections_prefix: str
     :param variables_prefix: Specifies the prefix of the secret to read to get Variables.
         If set to None (null), requests for variables will not be sent to GCP Secrets Manager
-    :type variables_prefix: str
     :param config_prefix: Specifies the prefix of the secret to read to get Airflow Configurations
         containing secrets.
         If set to None (null), requests for configurations will not be sent to GCP Secrets Manager
-    :type config_prefix: str
     :param gcp_key_path: Path to Google Cloud Service Account key file (JSON). Mutually exclusive with
         gcp_keyfile_dict. use default credentials in the current environment if not provided.
-    :type gcp_key_path: str
     :param gcp_keyfile_dict: Dictionary of keyfile parameters. Mutually exclusive with gcp_key_path.
-    :type gcp_keyfile_dict: dict
     :param gcp_scopes: Comma-separated string containing OAuth2 scopes
-    :type gcp_scopes: str
     :param project_id: Project ID to read the secrets from. If not passed, the project ID from credentials
         will be used.
-    :type project_id: str
     :param sep: Separator used to concatenate connections_prefix and conn_id. Default: "-"
-    :type sep: str
     """
 
     def __init__(
@@ -101,17 +101,25 @@ class CloudSecretManagerBackend(BaseSecretsBackend, LoggingMixin):
                     "`connections_prefix`, `variables_prefix` and `sep` should "
                     f"follows that pattern {SECRET_ID_PATTERN}"
                 )
-        self.credentials, self.project_id = get_credentials_and_project_id(
-            keyfile_dict=gcp_keyfile_dict, key_path=gcp_key_path, scopes=gcp_scopes
-        )
+        try:
+            self.credentials, self.project_id = get_credentials_and_project_id(
+                keyfile_dict=gcp_keyfile_dict, key_path=gcp_key_path, scopes=gcp_scopes
+            )
+        except (DefaultCredentialsError, FileNotFoundError):
+            log.exception(
+                'Unable to load credentials for GCP Secret Manager. '
+                'Make sure that the keyfile path, dictionary, or GOOGLE_APPLICATION_CREDENTIALS '
+                'environment variable is correct and properly configured.'
+            )
+
         # In case project id provided
         if project_id:
             self.project_id = project_id
 
-    @cached_property
+    @property
     def client(self) -> _SecretManagerClient:
         """
-        Cached property returning secret client.
+        Property returning secret client.
 
         :return: Secrets client
         """
@@ -121,17 +129,34 @@ class CloudSecretManagerBackend(BaseSecretsBackend, LoggingMixin):
         prefix = self.connections_prefix + self.sep
         return _SecretManagerClient.is_valid_secret_name(prefix)
 
-    def get_conn_uri(self, conn_id: str) -> Optional[str]:
+    def get_conn_value(self, conn_id: str) -> Optional[str]:
         """
-        Get secret value from the SecretManager.
+        Get serialized representation of Connection
 
         :param conn_id: connection id
-        :type conn_id: str
         """
         if self.connections_prefix is None:
             return None
 
         return self._get_secret(self.connections_prefix, conn_id)
+
+    def get_conn_uri(self, conn_id: str) -> Optional[str]:
+        """
+        Return URI representation of Connection conn_id.
+
+        As of Airflow version 2.3.0 this method is deprecated.
+
+        :param conn_id: the connection id
+        :return: deserialized Connection
+        """
+        if _parse_version(airflow_version) >= (2, 3):
+            warnings.warn(
+                f"Method `{self.__class__.__name__}.get_conn_uri` is deprecated and will be removed "
+                "in a future release.  Please use method `get_conn_value` instead.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+        return self.get_conn_value(conn_id)
 
     def get_variable(self, key: str) -> Optional[str]:
         """
@@ -162,9 +187,7 @@ class CloudSecretManagerBackend(BaseSecretsBackend, LoggingMixin):
         Get secret value from the SecretManager based on prefix.
 
         :param path_prefix: Prefix for the Path to get Secret
-        :type path_prefix: str
         :param secret_id: Secret Key
-        :type secret_id: str
         """
         secret_id = self.build_path(path_prefix, secret_id, self.sep)
         return self.client.get_secret(secret_id=secret_id, project_id=self.project_id)

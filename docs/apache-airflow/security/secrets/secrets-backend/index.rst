@@ -15,16 +15,15 @@
     specific language governing permissions and limitations
     under the License.
 
-
-Secrets backend
+Secrets Backend
 ---------------
 
 .. versionadded:: 1.10.10
 
-In addition to retrieving connections & variables from environment variables or the metastore database, you can enable
-an alternative secrets backend to retrieve Airflow connections or Airflow variables,
-such as :ref:`Google Cloud Secret Manager<google_cloud_secret_manager_backend>`,
-:ref:`Hashicorp Vault Secrets<hashicorp_vault_secrets>` or you can :ref:`roll your own <roll_your_own_secrets_backend>`.
+In addition to retrieving connections & variables from environment variables or the metastore database, you
+can also enable alternative secrets backend to retrieve Airflow connections or Airflow variables via
+:ref:`Apache Airflow Community provided backends <community_secret_backends>` in
+:doc:`apache-airflow-providers:core-extensions/secrets-backends`.
 
 .. note::
 
@@ -41,6 +40,12 @@ database second.
 
 If you enable an alternative secrets backend, it will be searched first, followed by environment variables,
 then metastore.  This search ordering is not configurable.
+
+.. warning::
+
+    When using environment variables or an alternative secrets backend to store secrets or variables, it is possible to create key collisions.
+    In the event of a duplicated key between backends, all write operations will update the value in the metastore, but all read operations will
+    return the first match for the requested key starting with the custom backend, then the environment variables and finally the metastore.
 
 .. _secrets_backend_configuration:
 
@@ -68,8 +73,8 @@ the example below.
     $ airflow config get-value secrets backend
     airflow.providers.google.cloud.secrets.secret_manager.CloudSecretManagerBackend
 
-Supported backends
-^^^^^^^^^^^^^^^^^^
+Supported core backends
+^^^^^^^^^^^^^^^^^^^^^^^
 
 .. toctree::
     :maxdepth: 1
@@ -77,13 +82,24 @@ Supported backends
 
     *
 
+.. _community_secret_backends:
+
+Apache Airflow Community provided secret backends
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Apache Airflow Community also releases community developed providers (:doc:`apache-airflow-providers:index`)
+and some of them also provide handlers that extend secret backends
+capability of Apache Airflow. You can see all those providers in
+:doc:`apache-airflow-providers:core-extensions/secrets-backends`.
+
+
 .. _roll_your_own_secrets_backend:
 
 Roll your own secrets backend
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 A secrets backend is a subclass of :py:class:`airflow.secrets.BaseSecretsBackend` and must implement either
-:py:meth:`~airflow.secrets.BaseSecretsBackend.get_connection` or :py:meth:`~airflow.secrets.BaseSecretsBackend.get_conn_uri`.
+:py:meth:`~airflow.secrets.BaseSecretsBackend.get_connection` or :py:meth:`~airflow.secrets.BaseSecretsBackend.get_conn_value`.
 
 After writing your backend class, provide the fully qualified class name in the ``backend`` key in the ``[secrets]``
 section of ``airflow.cfg``.
@@ -91,7 +107,13 @@ section of ``airflow.cfg``.
 Additional arguments to your SecretsBackend can be configured in ``airflow.cfg`` by supplying a JSON string to ``backend_kwargs``, which will be passed to the ``__init__`` of your SecretsBackend.
 See :ref:`Configuration <secrets_backend_configuration>` for more details, and :ref:`SSM Parameter Store <ssm_parameter_store_secrets>` for an example.
 
-.. note::
 
-    If you are rolling your own secrets backend, you don't strictly need to use airflow's URI format. But
-    doing so makes it easier to switch between environment variables, the metastore, and your secrets backend.
+Adapt to non-Airflow compatible secret formats for connections
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+The default implementation of Secret backend requires use of an Airflow-specific format of storing
+secrets for connections. Currently most community provided implementations require the connections to
+be stored as JSON or the Airflow Connection URI format (see
+:doc:`apache-airflow-providers:core-extensions/secrets-backends`). However some organizations may need to store the credentials (passwords/tokens etc) in some other way, for example if the same credentials store needs to be used for multiple data platforms, or if you are using a service with a built-in mechanism of rotating the credentials that does not work with the Airflow-specific format.
+In this case you will need to roll your own secret backend as described in the previous chapter,
+possibly extending an existing secrets backend and adapting it to the scheme used by your organization.

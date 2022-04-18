@@ -192,7 +192,7 @@ class TestDruidHook(unittest.TestCase):
 class TestDruidDbApiHook(unittest.TestCase):
     def setUp(self):
         super().setUp()
-        self.cur = MagicMock()
+        self.cur = MagicMock(rowcount=0)
         self.conn = conn = MagicMock()
         self.conn.host = 'host'
         self.conn.port = '1000'
@@ -242,8 +242,8 @@ class TestDruidDbApiHook(unittest.TestCase):
         df = self.db_hook().get_pandas_df(statement)
 
         assert column == df.columns[0]
-        for i in range(len(result_sets)):  # pylint: disable=consider-using-enumerate
-            assert result_sets[i][0] == df.values.tolist()[i][0]
+        for i, item in enumerate(result_sets):
+            assert item[0] == df.values.tolist()[i][0]
         assert self.conn.close.call_count == 1
         assert self.cur.close.call_count == 1
         self.cur.execute.assert_called_once_with(statement)

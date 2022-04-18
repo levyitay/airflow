@@ -19,7 +19,6 @@ from typing import Any, Dict, Optional, Sequence, Union
 
 from airflow.models import BaseOperator
 from airflow.providers.google.suite.hooks.sheets import GSheetsHook
-from airflow.utils.decorators import apply_defaults
 
 
 class GoogleSheetsCreateSpreadsheetOperator(BaseOperator):
@@ -32,13 +31,10 @@ class GoogleSheetsCreateSpreadsheetOperator(BaseOperator):
 
     :param spreadsheet: an instance of Spreadsheet
         https://developers.google.com/sheets/api/reference/rest/v4/spreadsheets#Spreadsheet
-    :type spreadsheet: Dict[str, Any]
     :param gcp_conn_id: The connection ID to use when fetching connection info.
-    :type gcp_conn_id: str
     :param delegate_to: The account to impersonate using domain-wide delegation of authority,
         if any. For this to work, the service account making the request must have
         domain-wide delegation enabled.
-    :type delegate_to: str
     :param impersonation_chain: Optional service account to impersonate using short-term
         credentials, or chained list of accounts required to get the access_token
         of the last account in the list, which will be impersonated in the request.
@@ -47,15 +43,13 @@ class GoogleSheetsCreateSpreadsheetOperator(BaseOperator):
         If set as a sequence, the identities from the list must grant
         Service Account Token Creator IAM role to the directly preceding identity, with first
         account from the list granting this role to the originating account (templated).
-    :type impersonation_chain: Union[str, Sequence[str]]
     """
 
-    template_fields = [
+    template_fields: Sequence[str] = (
         "spreadsheet",
         "impersonation_chain",
-    ]
+    )
 
-    @apply_defaults
     def __init__(
         self,
         *,

@@ -159,6 +159,12 @@ This assumes all other Connection fields eg **Login** are empty.
           "headers":{"Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"},
           "verify":false
         },
+        "idp_request_retry_kwargs": {
+          "total": 10,
+          "backoff_factor":1,
+          "status":10,
+          "status_forcelist": [400, 429, 500, 502, 503, 504]
+        },
         "log_idp_response":false,
         "saml_response_xpath":"////INPUT[@NAME='SAMLResponse']/@VALUE",
       },
@@ -173,6 +179,7 @@ The following settings may be used within the ``assume_role_with_saml`` containe
     * ``idp_auth_method``: Specify "http_spegno_auth" to use the Python ``requests_gssapi`` library. This library is more up to date than ``requests_kerberos`` and is backward compatible. See ``requests_gssapi`` documentation on PyPI.
     * ``mutual_authentication``: Can be "REQUIRED", "OPTIONAL" or "DISABLED". See ``requests_gssapi`` documentation on PyPI.
     * ``idp_request_kwargs``: Additional ``kwargs`` passed to ``requests`` when requesting from the IDP (over HTTP/S).
+    * ``idp_request_retry_kwargs``: Additional ``kwargs`` to construct a ``urllib3.util.Retry`` used as a retry strategy when requesting from the IDP. See the ``urllib3`` documentation for more details.
     * ``log_idp_response``: Useful for debugging - if specified, print the IDP response content to the log. Note that a successful response will contain sensitive information!
     * ``saml_response_xpath``: How to query the IDP response using XML / HTML xpath.
     * ``assume_role_kwargs``: Additional ``kwargs`` passed to ``sts_client.assume_role_with_saml``.
@@ -185,6 +192,106 @@ The following settings may be used within the ``assume_role_with_saml`` containe
     :class:`~airflow.providers.amazon.aws.hooks.base_aws.AwsBaseHook`
     https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_temp_request.html#api_assumerolewithsaml
     https://pypi.org/project/requests-gssapi/
+
+
+.. _howto/connection:aws:session-factory:
+
+Session Factory
+---------------
+
+The default ``BaseSessionFactory`` for the connection can handle most of the authentication methods for AWS.
+In the case that you would like to have full control of
+`boto3 session <https://boto3.amazonaws.com/v1/documentation/api/latest/reference/core/session.html>`__ creation or
+you are using custom `federation <https://aws.amazon.com/identity/federation/>`__ that requires
+`external process to source the credentials <https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-sourcing-external.html>`__,
+you can subclass :class:`~airflow.providers.amazon.aws.hooks.base_aws.BaseSessionFactory` and override ``create_session``
+and/or ``_create_basic_session`` method depending on your needs.
+
+You will also need to add configuration for ``AwsBaseHook`` to use the custom implementation by their full path.
+
+Example
+^^^^^^^
+
+**Configuration**:
+  .. code-block:: ini
+
+    [aws]
+    session_factory = my_company.aws.MyCustomSessionFactory
+
+**Connection extra field**:
+  .. code-block:: json
+
+    {
+      "federation": {
+        "username": "my_username",
+        "password": "my_password"
+      }
+    }
+
+**Custom Session Factory**:
+  .. code-block:: python
+
+    def get_federated_aws_credentials(username: str, password: str):
+        """
+        Mock interaction with federation endpoint/process and returns AWS credentials.
+        """
+        return {
+            "Version": 1,
+            "AccessKeyId": "key",
+            "SecretAccessKey": "secret",
+            "SessionToken": "token",
+            "Expiration": "2050-12-31T00:00:00.000Z",
+        }
+
+
+    class MyCustomSessionFactory(BaseSessionFactory):
+        @property
+        def federated(self):
+            return "federation" in self.extra_config
+
+        def _create_basic_session(
+            self, session_kwargs: Dict[str, Any]
+        ) -> boto3.session.Session:
+            if self.federated:
+                return self._create_federated_session(session_kwargs)
+            else:
+                return super()._create_basic_session(session_kwargs)
+
+        def _create_federated_session(
+            self, session_kwargs: Dict[str, Any]
+        ) -> boto3.session.Session:
+            username = self.extra_config["federation"]["username"]
+            region_name = self._get_region_name()
+            self.log.debug(
+                f"Creating federated session with username={username} region_name={region_name} for "
+                f"connection {self.conn.conn_id}"
+            )
+            credentials = RefreshableCredentials.create_from_metadata(
+                metadata=self._refresh_federated_credentials(),
+                refresh_using=self._refresh_federated_credentials,
+                method="custom-federation",
+            )
+            session = botocore.session.get_session()
+            session._credentials = credentials
+            session.set_config_variable("region", region_name)
+            return boto3.session.Session(botocore_session=session, **session_kwargs)
+
+        def _refresh_federated_credentials(self) -> Dict[str, str]:
+            self.log.debug("Refreshing federated AWS credentials")
+            credentials = get_federated_aws_credentials(**self.extra_config["federation"])
+            access_key_id = credentials["AccessKeyId"]
+            expiry_time = credentials["Expiration"]
+            self.log.info(
+                f"New federated AWS credentials received with aws_access_key_id={access_key_id} and "
+                f"expiry_time={expiry_time} for connection {self.conn.conn_id}"
+            )
+            return {
+                "access_key": access_key_id,
+                "secret_key": credentials["SecretAccessKey"],
+                "token": credentials["SessionToken"],
+                "expiry_time": expiry_time,
+            }
+
 
 .. _howto/connection:aws:gcp-federation:
 
@@ -408,3 +515,19 @@ You can configure connection, also using environmental variable :envvar:`AIRFLOW
     assume_role_method=assume_role_with_web_identity&\
     assume_role_with_web_identity_federation=google&\
     assume_role_with_web_identity_federation_audience=aaa.polidea.com"
+
+Using IAM Roles for Service Accounts (IRSA) on EKS
+----------------------------------------------------------------
+
+If you are running Airflow on Amazon EKS, you can grant AWS related permission (such as S3 Read/Write for remote logging) to the Airflow service by granting the IAM role to it's service account.  To activate this, the following steps must be followed:
+
+1. Create an IAM OIDC Provider on EKS cluster.
+2. Create an IAM Role and Policy to attach to the Airflow service account with web identity provider created at 1.
+3. Add the corresponding IAM Role to the Airflow service account as an annotation.
+
+.. seealso::
+    https://docs.aws.amazon.com/eks/latest/userguide/iam-roles-for-service-accounts.html
+
+Then you can find ``AWS_ROLE_ARN`` and ``AWS_WEB_IDENTITY_TOKEN_FILE`` in environment variables of appropriate pods that `Amazon EKS Pod Identity Web Hook <https://github.com/aws/amazon-eks-pod-identity-webhook>`__ added. Then `boto3 <https://boto3.amazonaws.com/v1/documentation/api/latest/guide/credentials.html#configuring-credentials>`__ will configure credentials using those variables.
+
+In order to use IRSA in Airflow, you have to create an aws connection with all fields empty. If a field such as ``role-arn`` is set, Airflow does not follow the boto3 default flow because it manually create a session using connection fields. If you did not change the default connection ID, an empty AWS connection named ``aws_default`` would be enough.

@@ -16,10 +16,11 @@
 # specific language governing permissions and limitations
 # under the License.
 import os
+import sys
 
-try:
+if sys.version_info >= (3, 8):
     from functools import cached_property
-except ImportError:
+else:
     from cached_property import cached_property
 
 from airflow.configuration import conf
@@ -50,7 +51,7 @@ class S3TaskHandler(FileTaskHandler, LoggingMixin):
             from airflow.providers.amazon.aws.hooks.s3 import S3Hook
 
             return S3Hook(remote_conn_id, transfer_config_args={"use_threads": False})
-        except Exception as e:  # pylint: disable=broad-except
+        except Exception as e:
             self.log.exception(
                 'Could not create an S3Hook with connection id "%s". '
                 'Please make sure that apache-airflow[aws] is installed and '
@@ -119,7 +120,7 @@ class S3TaskHandler(FileTaskHandler, LoggingMixin):
 
         try:
             log_exists = self.s3_log_exists(remote_loc)
-        except Exception as error:  # pylint: disable=broad-except
+        except Exception as error:
             self.log.exception("Failed to verify remote log exists %s.", remote_loc)
             log = f'*** Failed to verify remote log exists {remote_loc}.\n{error}\n'
 
@@ -140,7 +141,6 @@ class S3TaskHandler(FileTaskHandler, LoggingMixin):
         Check if remote_log_location exists in remote storage
 
         :param remote_log_location: log's location in remote storage
-        :type remote_log_location: str
         :return: True if location exists else False
         """
         return self.hook.check_for_key(remote_log_location)
@@ -151,15 +151,13 @@ class S3TaskHandler(FileTaskHandler, LoggingMixin):
         logs are found or there is an error.
 
         :param remote_log_location: the log's location in remote storage
-        :type remote_log_location: str (path)
         :param return_error: if True, returns a string error message if an
             error occurs. Otherwise returns '' when an error occurs.
-        :type return_error: bool
         :return: the log found at the remote_log_location
         """
         try:
             return self.hook.read_key(remote_log_location)
-        except Exception as error:  # pylint: disable=broad-except
+        except Exception as error:
             msg = f'Could not read logs from {remote_log_location} with error: {error}'
             self.log.exception(msg)
             # return error if needed
@@ -167,32 +165,38 @@ class S3TaskHandler(FileTaskHandler, LoggingMixin):
                 return msg
         return ''
 
-    def s3_write(self, log: str, remote_log_location: str, append: bool = True):
+    def s3_write(self, log: str, remote_log_location: str, append: bool = True, max_retry: int = 1):
         """
         Writes the log to the remote_log_location. Fails silently if no hook
         was created.
 
         :param log: the log to write to the remote_log_location
-        :type log: str
         :param remote_log_location: the log's location in remote storage
-        :type remote_log_location: str (path)
         :param append: if False, any existing log file is overwritten. If True,
             the new log is appended to any existing logs.
-        :type append: bool
+        :param max_retry: Maximum number of times to retry on upload failure
         """
         try:
             if append and self.s3_log_exists(remote_log_location):
                 old_log = self.s3_read(remote_log_location)
                 log = '\n'.join([old_log, log]) if old_log else log
-        except Exception:  # pylint: disable=broad-except
+        except Exception:
             self.log.exception('Could not verify previous log to append')
 
-        try:
-            self.hook.load_string(
-                log,
-                key=remote_log_location,
-                replace=True,
-                encrypt=conf.getboolean('logging', 'ENCRYPT_S3_LOGS'),
-            )
-        except Exception:  # pylint: disable=broad-except
-            self.log.exception('Could not write logs to %s', remote_log_location)
+        # Default to a single retry attempt because s3 upload failures are
+        # rare but occasionally occur.  Multiple retry attempts are unlikely
+        # to help as they usually indicate non-empheral errors.
+        for try_num in range(1 + max_retry):
+            try:
+                self.hook.load_string(
+                    log,
+                    key=remote_log_location,
+                    replace=True,
+                    encrypt=conf.getboolean('logging', 'ENCRYPT_S3_LOGS'),
+                )
+                break
+            except Exception:
+                if try_num < max_retry:
+                    self.log.warning('Failed attempt to write logs to %s, will retry', remote_log_location)
+                else:
+                    self.log.exception('Could not write logs to %s', remote_log_location)

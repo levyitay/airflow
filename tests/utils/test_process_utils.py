@@ -35,7 +35,7 @@ import pytest
 
 from airflow.exceptions import AirflowException
 from airflow.utils import process_utils
-from airflow.utils.process_utils import check_if_pidfile_process_is_running, execute_in_subprocess, log
+from airflow.utils.process_utils import check_if_pidfile_process_is_running, execute_in_subprocess
 
 
 class TestReapProcessGroup(unittest.TestCase):
@@ -90,20 +90,28 @@ class TestReapProcessGroup(unittest.TestCase):
             assert not psutil.pid_exists(child_pid.value)
         finally:
             try:
-                os.kill(parent_pid.value, signal.SIGKILL)  # terminate doesnt work here
-                os.kill(child_pid.value, signal.SIGKILL)  # terminate doesnt work here
+                os.kill(parent_pid.value, signal.SIGKILL)  # terminate doesn't work here
+                os.kill(child_pid.value, signal.SIGKILL)  # terminate doesn't work here
             except OSError:
                 pass
 
 
-class TestExecuteInSubProcess(unittest.TestCase):
-    def test_should_print_all_messages1(self):
-        with self.assertLogs(log) as logs:
-            execute_in_subprocess(["bash", "-c", "echo CAT; echo KITTY;"])
-
-        msgs = [record.getMessage() for record in logs.records]
-
+class TestExecuteInSubProcess:
+    def test_should_print_all_messages1(self, caplog):
+        execute_in_subprocess(["bash", "-c", "echo CAT; echo KITTY;"])
+        msgs = [record.getMessage() for record in caplog.records]
         assert ["Executing cmd: bash -c 'echo CAT; echo KITTY;'", 'Output:', 'CAT', 'KITTY'] == msgs
+
+    def test_should_print_all_messages_from_cwd(self, caplog, tmp_path):
+        execute_in_subprocess(["bash", "-c", "echo CAT; pwd; echo KITTY;"], cwd=str(tmp_path))
+        msgs = [record.getMessage() for record in caplog.records]
+        assert [
+            "Executing cmd: bash -c 'echo CAT; pwd; echo KITTY;'",
+            'Output:',
+            'CAT',
+            str(tmp_path),
+            'KITTY',
+        ] == msgs
 
     def test_should_raise_exception(self):
         with pytest.raises(CalledProcessError):

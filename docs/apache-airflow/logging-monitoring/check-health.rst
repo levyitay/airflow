@@ -20,9 +20,13 @@
 Checking Airflow Health Status
 ==============================
 
-Airflow has two methods to check the health of components - HTTP checks and CLI checks. Their choice depends on the role of the component as well as what tools it uses to monitor the deployment.
+Airflow has two methods to check the health of components - HTTP checks and CLI checks. All available checks are
+accessible through the CLI, but only some are accessible through HTTP due to the role of the component being checked
+and the tools being used to monitor the deployment.
 
-For example, when running on Kubernetes, use `a Liveness probes <https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/>`__ (``livenessProbe`` property) with :ref:`CLI checks <check-health/cli-checks-for-scheduler>` on the scheduler deployment to restart it when it fail. For the webserver, you can configure the readiness probe (``readinessProbe`` property) using :ref:`check-health/http-endpoint`.
+For example, when running on Kubernetes, use `a Liveness probes <https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/>`__ (``livenessProbe`` property)
+with :ref:`CLI checks <check-health/cli-checks-for-scheduler>` on the scheduler deployment to restart it when it fails.
+For the webserver, you can configure the readiness probe (``readinessProbe`` property) using :ref:`check-health/http-endpoint`.
 
 For an example for a Docker Compose environment, see the ``docker-compose.yaml`` file available in the :doc:`/start/docker`.
 
@@ -101,12 +105,12 @@ HTTP monitoring for Celery Cluster
 
 You can use Flower to monitor the health of the Celery cluster. It also provides an HTTP API that you can use to build a health check for your environment.
 
-For details about installation, see: :ref:`executor:CeleryExecutor`. For details about usage, see: `The Flower project documentation <https://flower.readthedocs.io/en/stable/>`__.
+For details about installation, see: :ref:`executor:CeleryExecutor`. For details about usage, see: `The Flower project documentation <https://flower.readthedocs.io/>`__.
 
 CLI Check for Celery Workers
 ----------------------------
 
-To verify that the database is working correctly, you can use the ``celery inspect ping`` command. On failure, the command will exit
+To verify that the Celery workers are working correctly, you can use the ``celery inspect ping`` command. On failure, the command will exit
 with a non-zero error code.
 
 To check if the worker running on the local host is working correctly, run:

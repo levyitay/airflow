@@ -20,8 +20,12 @@ import logging
 import os
 import re
 import zipfile
+from collections import OrderedDict
 from pathlib import Path
-from typing import TYPE_CHECKING, Dict, Generator, List, Optional, Pattern, Union
+from typing import TYPE_CHECKING, Dict, Generator, List, NamedTuple, Optional, Pattern, Type, Union, overload
+
+from pathspec.patterns import GitWildMatchPattern
+from typing_extensions import Protocol
 
 from airflow.configuration import conf
 
@@ -31,7 +35,89 @@ if TYPE_CHECKING:
 log = logging.getLogger(__name__)
 
 
-def TemporaryDirectory(*args, **kwargs):  # pylint: disable=invalid-name
+class _IgnoreRule(Protocol):
+    """Interface for ignore rules for structural subtyping"""
+
+    @staticmethod
+    def compile(pattern: str, base_dir: Path, definition_file: Path) -> Optional['_IgnoreRule']:
+        pass
+
+    @staticmethod
+    def match(path: Path, rules: List['_IgnoreRule']) -> bool:
+        pass
+
+
+class _RegexpIgnoreRule(NamedTuple):
+    """Typed namedtuple with utility functions for regexp ignore rules"""
+
+    pattern: Pattern
+    base_dir: Path
+
+    @staticmethod
+    def compile(pattern: str, base_dir: Path, definition_file: Path) -> Optional[_IgnoreRule]:
+        """Build an ignore rule from the supplied regexp pattern and log a useful warning if it is invalid"""
+        try:
+            return _RegexpIgnoreRule(re.compile(pattern), base_dir.resolve())
+        except re.error as e:
+            log.warning("Ignoring invalid regex '%s' from %s: %s", pattern, definition_file, e)
+            return None
+
+    @staticmethod
+    def match(path: Path, rules: List[_IgnoreRule]) -> bool:
+        """Match a list of ignore rules against the supplied path"""
+        test_path: Path = path.resolve()
+        for rule in rules:
+            if not isinstance(rule, _RegexpIgnoreRule):
+                raise ValueError(f"_RegexpIgnoreRule cannot match rules of type: {type(rule)}")
+            if rule.pattern.search(str(test_path.relative_to(rule.base_dir))) is not None:
+                return True
+        return False
+
+
+class _GlobIgnoreRule(NamedTuple):
+    """Typed namedtuple with utility functions for glob ignore rules"""
+
+    pattern: Pattern
+    raw_pattern: str
+    include: Optional[bool] = None
+    relative_to: Optional[Path] = None
+
+    @staticmethod
+    def compile(pattern: str, _, definition_file: Path) -> Optional[_IgnoreRule]:
+        """Build an ignore rule from the supplied glob pattern and log a useful warning if it is invalid"""
+        relative_to: Optional[Path] = None
+        if pattern.strip() == "/":
+            # "/" doesn't match anything in gitignore
+            log.warning("Ignoring no-op glob pattern '/' from %s", definition_file)
+            return None
+        if pattern.startswith("/") or "/" in pattern.rstrip("/"):
+            # See https://git-scm.com/docs/gitignore
+            # > If there is a separator at the beginning or middle (or both) of the pattern, then the
+            # > pattern is relative to the directory level of the particular .gitignore file itself.
+            # > Otherwise the pattern may also match at any level below the .gitignore level.
+            relative_to = definition_file.resolve().parent
+        ignore_pattern = GitWildMatchPattern(pattern)
+        return _GlobIgnoreRule(ignore_pattern.regex, pattern, ignore_pattern.include, relative_to)
+
+    @staticmethod
+    def match(path: Path, rules: List[_IgnoreRule]) -> bool:
+        """Match a list of ignore rules against the supplied path"""
+        test_path: Path = path.resolve()
+        matched = False
+        for r in rules:
+            if not isinstance(r, _GlobIgnoreRule):
+                raise ValueError(f"_GlobIgnoreRule cannot match rules of type: {type(r)}")
+            rule: _GlobIgnoreRule = r  # explicit typing to make mypy play nicely
+            rel_path = str(test_path.relative_to(rule.relative_to) if rule.relative_to else test_path.name)
+            if rule.raw_pattern.endswith("/") and test_path.is_dir():
+                # ensure the test path will potentially match a directory pattern if it is a directory
+                rel_path += "/"
+            if rule.include is not None and rule.pattern.match(rel_path) is not None:
+                matched = rule.include
+        return matched
+
+
+def TemporaryDirectory(*args, **kwargs):
     """This function is deprecated. Please use `tempfile.TemporaryDirectory`"""
     import warnings
     from tempfile import TemporaryDirectory as TmpDir
@@ -41,7 +127,7 @@ def TemporaryDirectory(*args, **kwargs):  # pylint: disable=invalid-name
         DeprecationWarning,
         stacklevel=2,
     )
-    # pylint: disable=consider-using-with
+
     return TmpDir(*args, **kwargs)
 
 
@@ -51,9 +137,7 @@ def mkdirs(path, mode):
     as necessary. If directory already exists, this is a no-op.
 
     :param path: The directory to create
-    :type path: str
     :param mode: The mode to give to the directory e.g. 0o755, ignores umask
-    :type mode: int
     """
     import warnings
 
@@ -68,12 +152,27 @@ def mkdirs(path, mode):
 ZIP_REGEX = re.compile(fr'((.*\.zip){re.escape(os.sep)})?(.*)')
 
 
-def correct_maybe_zipped(fileloc):
+@overload
+def correct_maybe_zipped(fileloc: None) -> None:
+    ...
+
+
+@overload
+def correct_maybe_zipped(fileloc: Union[str, Path]) -> Union[str, Path]:
+    ...
+
+
+def correct_maybe_zipped(fileloc: Union[None, str, Path]) -> Union[None, str, Path]:
     """
     If the path contains a folder with a .zip suffix, then
     the folder is treated as a zip archive and path to zip is returned.
     """
-    _, archive, _ = ZIP_REGEX.search(fileloc).groups()
+    if not fileloc:
+        return fileloc
+    search_ = ZIP_REGEX.search(str(fileloc))
+    if not search_:
+        return fileloc
+    _, archive, _ = search_.groups()
     if archive and zipfile.is_zipfile(archive):
         return archive
     else:
@@ -91,48 +190,79 @@ def open_maybe_zipped(fileloc, mode='r'):
     if archive and zipfile.is_zipfile(archive):
         return io.TextIOWrapper(zipfile.ZipFile(archive, mode=mode).open(filename))
     else:
-        # pylint: disable=consider-using-with
+
         return open(fileloc, mode=mode)
 
 
-def find_path_from_directory(base_dir_path: str, ignore_file_name: str) -> Generator[str, None, None]:
+def _find_path_from_directory(
+    base_dir_path: str,
+    ignore_file_name: str,
+    ignore_rule_type: Type[_IgnoreRule],
+) -> Generator[str, None, None]:
     """
-    Search the file and return the path of the file that should not be ignored.
-    :param base_dir_path: the base path to be searched for.
-    :param ignore_file_name: the file name in which specifies a regular expression pattern is written.
+    Recursively search the base path and return the list of file paths that should not be ignored by
+    regular expressions in any ignore files at each directory level.
+    :param base_dir_path: the base path to be searched
+    :param ignore_file_name: the file name containing regular expressions for files that should be ignored.
+    :param ignore_rule_type: the concrete class for ignore rules, which implements the _IgnoreRule interface.
 
-    :return : file path not to be ignored.
+    :return: a generator of file paths which should not be ignored.
     """
-    patterns_by_dir: Dict[str, List[Pattern[str]]] = {}
+    patterns_by_dir: Dict[Path, List[_IgnoreRule]] = {}
 
-    for root, dirs, files in os.walk(str(base_dir_path), followlinks=True):
-        patterns: List[Pattern[str]] = patterns_by_dir.get(root, [])
+    for root, dirs, files in os.walk(base_dir_path, followlinks=True):
+        patterns: List[_IgnoreRule] = patterns_by_dir.get(Path(root), [])
 
-        ignore_file_path = os.path.join(root, ignore_file_name)
-        if os.path.isfile(ignore_file_path):
-            with open(ignore_file_path) as file:
-                lines_no_comments = [re.sub(r"\s*#.*", "", line) for line in file.read().split("\n")]
-                patterns += [re.compile(line) for line in lines_no_comments if line]
-                patterns = list(set(patterns))
+        ignore_file_path = Path(root) / ignore_file_name
+        if ignore_file_path.is_file():
+            with open(ignore_file_path) as ifile:
+                lines_no_comments = [re.sub(r"\s*#.*", "", line) for line in ifile.read().split("\n")]
+                # append new patterns and filter out "None" objects, which are invalid patterns
+                patterns += [
+                    p
+                    for p in [
+                        ignore_rule_type.compile(line, Path(base_dir_path), ignore_file_path)
+                        for line in lines_no_comments
+                        if line
+                    ]
+                    if p is not None
+                ]
+                # evaluation order of patterns is important with negation
+                # so that later patterns can override earlier patterns
+                patterns = list(OrderedDict.fromkeys(patterns).keys())
 
-        dirs[:] = [
-            subdir
-            for subdir in dirs
-            if not any(
-                p.search(os.path.join(os.path.relpath(root, str(base_dir_path)), subdir)) for p in patterns
-            )
-        ]
+        dirs[:] = [subdir for subdir in dirs if not ignore_rule_type.match(Path(root) / subdir, patterns)]
 
-        patterns_by_dir.update({os.path.join(root, sd): patterns.copy() for sd in dirs})
+        patterns_by_dir.update({Path(root) / sd: patterns.copy() for sd in dirs})
 
-        for file in files:  # type: ignore
+        for file in files:
             if file == ignore_file_name:
                 continue
-            abs_file_path = os.path.join(root, str(file))
-            rel_file_path = os.path.join(os.path.relpath(root, str(base_dir_path)), str(file))
-            if any(p.search(rel_file_path) for p in patterns):
+            abs_file_path = Path(root) / file
+            if ignore_rule_type.match(abs_file_path, patterns):
                 continue
             yield str(abs_file_path)
+
+
+def find_path_from_directory(
+    base_dir_path: str,
+    ignore_file_name: str,
+    ignore_file_syntax: str = conf.get('core', 'DAG_IGNORE_FILE_SYNTAX', fallback="regexp"),
+) -> Generator[str, None, None]:
+    """
+    Recursively search the base path and return the list of file paths that should not be ignored.
+    :param base_dir_path: the base path to be searched
+    :param ignore_file_name: the file name in which specifies the patterns of files/dirs to be ignored
+    :param ignore_file_syntax: the syntax of patterns in the ignore file: regexp or glob
+
+    :return: a generator of file paths.
+    """
+    if ignore_file_syntax == "glob":
+        return _find_path_from_directory(base_dir_path, ignore_file_name, _GlobIgnoreRule)
+    elif ignore_file_syntax == "regexp" or not ignore_file_syntax:
+        return _find_path_from_directory(base_dir_path, ignore_file_name, _RegexpIgnoreRule)
+    else:
+        raise ValueError(f"Unsupported ignore_file_syntax: {ignore_file_syntax}")
 
 
 def list_py_file_paths(
@@ -145,16 +275,12 @@ def list_py_file_paths(
     Traverse a directory and look for Python files.
 
     :param directory: the directory to traverse
-    :type directory: unicode
     :param safe_mode: whether to use a heuristic to determine whether a file
         contains Airflow DAG definitions. If not provided, use the
         core.DAG_DISCOVERY_SAFE_MODE configuration setting. If not set, default
         to safe.
-    :type safe_mode: bool
     :param include_examples: include example DAGs
-    :type include_examples: bool
     :param include_smart_sensor: include smart sensor native control DAGs
-    :type include_examples: bool
     :return: a list of paths to Python files in the specified directory
     :rtype: list[unicode]
     """
@@ -195,7 +321,7 @@ def find_dag_file_paths(directory: Union[str, "pathlib.Path"], safe_mode: bool) 
                 continue
 
             file_paths.append(file_path)
-        except Exception:  # noqa pylint: disable=broad-except
+        except Exception:
             log.exception("Error while examining %s", file_path)
 
     return file_paths
@@ -211,7 +337,7 @@ def might_contain_dag(file_path: str, safe_mode: bool, zip_file: Optional[zipfil
     :param file_path: Path to the file to be checked.
     :param safe_mode: Is safe mode active?. If no, this function always returns True.
     :param zip_file: if passed, checks the archive. Otherwise, check local filesystem.
-    :return: True, if file might contain DAGS.
+    :return: True, if file might contain DAGs.
     """
     if not safe_mode:
         return True

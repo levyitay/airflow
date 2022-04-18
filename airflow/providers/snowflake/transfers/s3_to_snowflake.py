@@ -17,11 +17,10 @@
 # under the License.
 
 """This module contains AWS S3 to Snowflake operator."""
-from typing import Any, Optional
+from typing import Any, Optional, Sequence
 
 from airflow.models import BaseOperator
 from airflow.providers.snowflake.hooks.snowflake import SnowflakeHook
-from airflow.utils.decorators import apply_defaults
 
 
 class S3ToSnowflakeOperator(BaseOperator):
@@ -33,32 +32,21 @@ class S3ToSnowflakeOperator(BaseOperator):
         :ref:`howto/operator:S3ToSnowflakeOperator`
 
     :param s3_keys: reference to a list of S3 keys
-    :type s3_keys: list
     :param table: reference to a specific table in snowflake database
-    :type table: str
     :param schema: name of schema (will overwrite schema defined in
         connection)
-    :type schema: str
     :param stage: reference to a specific snowflake stage. If the stage's schema is not the same as the
         table one, it must be specified
-    :type stage: str
     :param prefix: cloud storage location specified to limit the set of files to load
-    :type prefix: str
     :param file_format: reference to a specific file format
-    :type file_format: str
     :param warehouse: name of warehouse (will overwrite any warehouse
         defined in the connection's extra JSON)
-    :type warehouse: str
     :param database: reference to a specific database in Snowflake connection
-    :type database: str
     :param columns_array: reference to a specific columns array in snowflake database
-    :type columns_array: list
     :param snowflake_conn_id: Reference to
         :ref:`Snowflake connection id<howto/connection:snowflake>`
-    :type snowflake_conn_id: str
     :param role: name of role (will overwrite any role defined in
         connection's extra JSON)
-    :type role: str
     :param authenticator: authenticator for Snowflake.
         'snowflake' (default) to use the internal Snowflake authenticator
         'externalbrowser' to authenticate using your web browser and
@@ -66,13 +54,13 @@ class S3ToSnowflakeOperator(BaseOperator):
         (IdP) that has been defined for your account
         'https://<your_okta_account_name>.okta.com' to authenticate
         through native Okta.
-    :type authenticator: str
     :param session_parameters: You can set session-level parameters at
         the time you connect to Snowflake
-    :type session_parameters: dict
     """
 
-    @apply_defaults
+    template_fields: Sequence[str] = ("s3_keys",)
+    template_fields_renderers = {"s3_keys": "json"}
+
     def __init__(
         self,
         *,
@@ -81,7 +69,7 @@ class S3ToSnowflakeOperator(BaseOperator):
         stage: str,
         prefix: Optional[str] = None,
         file_format: str,
-        schema: str,  # TODO: shouldn't be required, rely on session/user defaults
+        schema: Optional[str] = None,
         columns_array: Optional[list] = None,
         warehouse: Optional[str] = None,
         database: Optional[str] = None,
@@ -119,33 +107,23 @@ class S3ToSnowflakeOperator(BaseOperator):
             session_parameters=self.session_parameters,
         )
 
-        files = ""
-        if self.s3_keys:
-            files = "files=({})".format(", ".join(f"'{key}'" for key in self.s3_keys))
-
-        # we can extend this based on stage
-        base_sql = """
-                    FROM @{stage}/{prefix}
-                    {files}
-                    file_format={file_format}
-                """.format(
-            stage=self.stage,
-            prefix=(self.prefix if self.prefix else ""),
-            files=files,
-            file_format=self.file_format,
-        )
-
-        if self.columns_array:
-            copy_query = """
-                COPY INTO {schema}.{table}({columns}) {base_sql}
-            """.format(
-                schema=self.schema, table=self.table, columns=",".join(self.columns_array), base_sql=base_sql
-            )
+        if self.schema:
+            into = f"{self.schema}.{self.table}"
         else:
-            copy_query = f"""
-                COPY INTO {self.schema}.{self.table} {base_sql}
-            """
-        copy_query = "\n".join(line.strip() for line in copy_query.splitlines())
+            into = self.table
+        if self.columns_array:
+            into = f"{into}({','.join(self.columns_array)})"
+
+        sql_parts = [
+            f"COPY INTO {into}",
+            f"FROM @{self.stage}/{self.prefix or ''}",
+        ]
+        if self.s3_keys:
+            files = ", ".join(f"'{key}'" for key in self.s3_keys)
+            sql_parts.append(f"files=({files})")
+        sql_parts.append(f"file_format={self.file_format}")
+
+        copy_query = "\n".join(sql_parts)
 
         self.log.info('Executing COPY command...')
         snowflake_hook.run(copy_query, self.autocommit)

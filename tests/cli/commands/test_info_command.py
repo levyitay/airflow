@@ -21,8 +21,8 @@ import io
 import logging
 import os
 import unittest
-from unittest import mock
 
+import pytest
 from parameterized import parameterized
 from rich.console import Console
 
@@ -76,13 +76,13 @@ class TestPiiAnonymizer(unittest.TestCase):
 class TestAirflowInfo:
     @classmethod
     def setup_class(cls):
-        # pylint: disable=attribute-defined-outside-init
+
         cls.parser = cli_parser.get_parser()
 
     @classmethod
     def teardown_class(cls) -> None:
-        for handler_ref in logging._handlerList[:]:
-            logging._removeHandlerRef(handler_ref)
+        for handler_ref in logging._handlerList[:]:  # type: ignore
+            logging._removeHandlerRef(handler_ref)  # type: ignore
         importlib.reload(airflow_local_settings)
         configure_logging()
 
@@ -96,7 +96,7 @@ class TestAirflowInfo:
             ("core", "dags_folder"): "TEST_DAGS_FOLDER",
             ("core", "plugins_folder"): "TEST_PLUGINS_FOLDER",
             ("logging", "base_log_folder"): "TEST_LOG_FOLDER",
-            ('core', 'sql_alchemy_conn'): 'postgresql+psycopg2://postgres:airflow@postgres/airflow',
+            ('database', 'sql_alchemy_conn'): 'postgresql+psycopg2://postgres:airflow@postgres/airflow',
             ('logging', 'remote_logging'): 'True',
             ('logging', 'remote_base_log_folder'): 's3://logs-name',
         }
@@ -144,7 +144,7 @@ class TestAirflowInfo:
 
     @conf_vars(
         {
-            ('core', 'sql_alchemy_conn'): 'postgresql+psycopg2://postgres:airflow@postgres/airflow',
+            ('database', 'sql_alchemy_conn'): 'postgresql+psycopg2://postgres:airflow@postgres/airflow',
         }
     )
     def test_show_info(self):
@@ -157,7 +157,7 @@ class TestAirflowInfo:
 
     @conf_vars(
         {
-            ('core', 'sql_alchemy_conn'): 'postgresql+psycopg2://postgres:airflow@postgres/airflow',
+            ('database', 'sql_alchemy_conn'): 'postgresql+psycopg2://postgres:airflow@postgres/airflow',
         }
     )
     def test_show_info_anonymize(self):
@@ -168,27 +168,30 @@ class TestAirflowInfo:
         assert airflow_version in output
         assert "postgresql+psycopg2://p...s:PASSWORD@postgres/airflow" in output
 
+
+@pytest.fixture()
+def setup_parser():
+    yield cli_parser.get_parser()
+
+
+class TestInfoCommandMockHttpx:
     @conf_vars(
         {
-            ('core', 'sql_alchemy_conn'): 'postgresql+psycopg2://postgres:airflow@postgres/airflow',
+            ('database', 'sql_alchemy_conn'): 'postgresql+psycopg2://postgres:airflow@postgres/airflow',
         }
     )
-    @mock.patch(
-        "airflow.cli.commands.info_command.requests",
-        **{  # type: ignore
-            "post.return_value.ok": True,
-            "post.return_value.json.return_value": {
+    def test_show_info_anonymize_fileio(self, httpx_mock, setup_parser):
+        httpx_mock.add_response(
+            url="https://file.io",
+            method="post",
+            json={
                 "success": True,
                 "key": "f9U3zs3I",
                 "link": "https://file.io/TEST",
                 "expiry": "14 days",
             },
-        },
-    )
-    def test_show_info_anonymize_fileio(self, mock_requests):
+            status_code=200,
+        )
         with contextlib.redirect_stdout(io.StringIO()) as stdout:
-            info_command.show_info(self.parser.parse_args(["info", "--file-io"]))
-
+            info_command.show_info(setup_parser.parse_args(["info", "--file-io"]))
         assert "https://file.io/TEST" in stdout.getvalue()
-        content = mock_requests.post.call_args[1]["data"]["text"]
-        assert "postgresql+psycopg2://p...s:PASSWORD@postgres/airflow" in content

@@ -22,10 +22,6 @@ Google Cloud Dataflow Operators
 executing a wide variety of data processing patterns. These pipelines are created
 using the Apache Beam programming model which allows for both batch and streaming processing.
 
-.. contents::
-  :depth: 1
-  :local:
-
 Prerequisite Tasks
 ^^^^^^^^^^^^^^^^^^
 
@@ -137,7 +133,7 @@ By default :class:`~airflow.providers.google.cloud.operators.dataflow.DataflowCr
 :class:`~airflow.providers.google.cloud.operators.dataflow.DataflowCreatePythonJobOperator`,
 :class:`~airflow.providers.google.cloud.operators.dataflow.DataflowTemplatedJobStartOperator` and
 :class:`~airflow.providers.google.cloud.operators.dataflow.DataflowStartFlexTemplateOperator`
-have argument ``wait_until_finished`` set to ``None`` which cause different behaviour depends om the type of pipeline:
+have argument ``wait_until_finished`` set to ``None`` which cause different behaviour depends on the type of pipeline:
 
 * for the streaming pipeline, wait for jobs to start,
 * for the batch pipeline, wait for the jobs to complete.

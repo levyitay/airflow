@@ -47,7 +47,7 @@ def init_jinja_globals(app):
 
     try:
         airflow_version = airflow.__version__
-    except Exception as e:  # pylint: disable=broad-except
+    except Exception as e:
         airflow_version = None
         logging.error(e)
 
@@ -66,7 +66,12 @@ def init_jinja_globals(app):
             'airflow_version': airflow_version,
             'git_version': git_version,
             'k8s_or_k8scelery_executor': IS_K8S_OR_K8SCELERY_EXECUTOR,
+            'rest_api_enabled': False,
         }
+
+        backends = conf.get('api', 'auth_backends')
+        if len(backends) > 0 and backends[0] != 'airflow.api.auth.backend.deny_all':
+            extra_globals['rest_api_enabled'] = True
 
         if 'analytics_tool' in conf.getsection('webserver'):
             extra_globals.update(

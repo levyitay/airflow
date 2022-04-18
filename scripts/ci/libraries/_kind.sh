@@ -19,67 +19,81 @@
 function kind::get_kind_cluster_name() {
     # Name of the KinD cluster to connect to
     export KIND_CLUSTER_NAME=${KIND_CLUSTER_NAME:="airflow-python-${PYTHON_MAJOR_MINOR_VERSION}-${KUBERNETES_VERSION}"}
+    readonly KIND_CLUSTER_NAME
     # Name of the KinD cluster to connect to when referred to via kubectl
     export KUBECTL_CLUSTER_NAME=kind-${KIND_CLUSTER_NAME}
+    readonly KUBECTL_CLUSTER_NAME
     export KUBECONFIG="${BUILD_CACHE_DIR}/${KIND_CLUSTER_NAME}/.kube/config"
+    readonly KUBECONFIG
     mkdir -pv "${BUILD_CACHE_DIR}/${KIND_CLUSTER_NAME}/.kube/"
     touch "${KUBECONFIG}"
+    chmod og-rwx "${KUBECONFIG}"
 }
 
 function kind::dump_kind_logs() {
     verbosity::print_info "Dumping logs from KinD"
-    local DUMP_DIR_NAME DUMP_DIR
-    DUMP_DIR_NAME=kind_logs_$(date "+%Y-%m-%d")_${CI_BUILD_ID}_${CI_JOB_ID}
-    DUMP_DIR="/tmp/${DUMP_DIR_NAME}"
-    kind --name "${KIND_CLUSTER_NAME}" export logs "${DUMP_DIR}"
+    local dump_dir_name dump_dir
+    dump_dir_name=kind_logs_$(date "+%Y-%m-%d")_${CI_BUILD_ID}_${CI_JOB_ID}
+    dump_dir="/tmp/${dump_dir_name}"
+    kind --name "${KIND_CLUSTER_NAME}" export logs "${dump_dir}"
 }
 
 function kind::make_sure_kubernetes_tools_are_installed() {
-    SYSTEM=$(uname -s | tr '[:upper:]' '[:lower:]')
-
-    KIND_URL="https://github.com/kubernetes-sigs/kind/releases/download/${KIND_VERSION}/kind-${SYSTEM}-amd64"
+    local system
+    system=$(uname -s | tr '[:upper:]' '[:lower:]')
+    local machine
+    if [[ $(uname -m) == "arm64" || $(uname -m) == "aarch64" ]]; then
+        machine="arm64"
+    else
+        machine="amd64"
+    fi
+    local kind_url
+    kind_url="https://github.com/kubernetes-sigs/kind/releases/download/${KIND_VERSION}/kind-${system}-${machine}"
     mkdir -pv "${BUILD_CACHE_DIR}/kubernetes-bin/${KUBERNETES_VERSION}"
     if [[ -f "${KIND_BINARY_PATH}" ]]; then
-        DOWNLOADED_KIND_VERSION=v"$(${KIND_BINARY_PATH} --version | awk '{ print $3 }')"
-        echo "Currently downloaded kind version = ${DOWNLOADED_KIND_VERSION}"
+        local downloaded_kind_version
+        downloaded_kind_version=v"$(${KIND_BINARY_PATH} --version | awk '{ print $3 }')"
+        echo "Currently downloaded kind version = ${downloaded_kind_version}"
     fi
-    if [[ ! -f "${KIND_BINARY_PATH}" || ${DOWNLOADED_KIND_VERSION} != "${KIND_VERSION}" ]]; then
+    if [[ ! -f "${KIND_BINARY_PATH}" || ${downloaded_kind_version} != "${KIND_VERSION}" ]]; then
         echo
         echo "Downloading Kind version ${KIND_VERSION}"
         repeats::run_with_retry 4 \
-            "curl --connect-timeout 60  --max-time 180 --fail --location '${KIND_URL}' --output '${KIND_BINARY_PATH}'"
+            "curl --connect-timeout 60  --max-time 180 --fail --location '${kind_url}' --output '${KIND_BINARY_PATH}'"
         chmod a+x "${KIND_BINARY_PATH}"
     else
         echo "Kind version ok"
         echo
     fi
-
-    KUBECTL_URL="https://storage.googleapis.com/kubernetes-release/release/${KUBECTL_VERSION}/bin/${SYSTEM}/amd64/kubectl"
+    local kubectl_url
+    kubectl_url="https://storage.googleapis.com/kubernetes-release/release/${KUBECTL_VERSION}/bin/${system}/${machine}/kubectl"
     if [[ -f "${KUBECTL_BINARY_PATH}" ]]; then
-        DOWNLOADED_KUBECTL_VERSION="$(${KUBECTL_BINARY_PATH} version --client=true --short | awk '{ print $3 }')"
-        echo "Currently downloaded kubectl version = ${DOWNLOADED_KUBECTL_VERSION}"
+        local downloaded_kubectl_version
+        downloaded_kubectl_version="$(${KUBECTL_BINARY_PATH} version --client=true --short | awk '{ print $3 }')"
+        echo "Currently downloaded kubectl version = ${downloaded_kubectl_version}"
     fi
-    if [[ ! -f "${KUBECTL_BINARY_PATH}" || ${DOWNLOADED_KUBECTL_VERSION} != "${KUBECTL_VERSION}" ]]; then
+    if [[ ! -f "${KUBECTL_BINARY_PATH}" || ${downloaded_kubectl_version} != "${KUBECTL_VERSION}" ]]; then
         echo
         echo "Downloading Kubectl version ${KUBECTL_VERSION}"
         repeats::run_with_retry 4 \
-            "curl --connect-timeout 60 --max-time 180 --fail --location '${KUBECTL_URL}' --output '${KUBECTL_BINARY_PATH}'"
+            "curl --connect-timeout 60 --max-time 180 --fail --location '${kubectl_url}' --output '${KUBECTL_BINARY_PATH}'"
         chmod a+x "${KUBECTL_BINARY_PATH}"
     else
         echo "Kubectl version ok"
         echo
     fi
-
-    HELM_URL="https://get.helm.sh/helm-${HELM_VERSION}-${SYSTEM}-amd64.tar.gz"
+    local helm_url
+    helm_url="https://get.helm.sh/helm-${HELM_VERSION}-${system}-${machine}.tar.gz"
     if [[ -f "${HELM_BINARY_PATH}" ]]; then
-        DOWNLOADED_HELM_VERSION="$(${HELM_BINARY_PATH} version --template '{{.Version}}')"
-        echo "Currently downloaded helm version = ${DOWNLOADED_HELM_VERSION}"
+        local downloaded_helm_version
+        downloaded_helm_version="$(${HELM_BINARY_PATH} version --template '{{.Version}}')"
+        echo "Currently downloaded helm version = ${downloaded_helm_version}"
     fi
-    if [[ ! -f "${HELM_BINARY_PATH}" || ${DOWNLOADED_HELM_VERSION} != "${HELM_VERSION}" ]]; then
+    if [[ ! -f "${HELM_BINARY_PATH}" || ${downloaded_helm_version} != "${HELM_VERSION}" ]]; then
         echo
         echo "Downloading Helm version ${HELM_VERSION}"
         repeats::run_with_retry 4 \
-            "curl --connect-timeout 60  --max-time 180 --location '${HELM_URL}' | tar -xvz -O '${SYSTEM}-amd64/helm' >'${HELM_BINARY_PATH}'"
+            "curl --connect-timeout 60  --max-time 180 --location '${helm_url}' | tar -xvz -O '${system}-${machine}/helm' >'${HELM_BINARY_PATH}'"
         chmod a+x "${HELM_BINARY_PATH}"
     else
         echo "Helm version ok"
@@ -115,6 +129,7 @@ function kind::set_current_context() {
 
 function kind::perform_kind_cluster_operation() {
     ALLOWED_KIND_OPERATIONS="[ start restart stop deploy test shell recreate k9s]"
+    readonly ALLOWED_KIND_OPERATIONS
     set +u
     if [[ -z "${1=}" ]]; then
         echo
@@ -124,19 +139,16 @@ function kind::perform_kind_cluster_operation() {
     fi
 
     set -u
-    OPERATION="${1}"
-    ALL_CLUSTERS=$(kind get clusters || true)
+    local operation="${1}"
+    local all_clusters
+    all_clusters=$(kind get clusters || true)
 
     echo
     echo "Kubernetes mode: ${KUBERNETES_MODE}"
     echo
 
-    echo
-    echo "Executor: ${EXECUTOR}"
-    echo
-
-    if [[ ${OPERATION} == "status" ]]; then
-        if [[ ${ALL_CLUSTERS} == *"${KIND_CLUSTER_NAME}"* ]]; then
+    if [[ ${operation} == "status" ]]; then
+        if [[ ${all_clusters} == *"${KIND_CLUSTER_NAME}"* ]]; then
             echo
             echo "Cluster name: ${KIND_CLUSTER_NAME}"
             echo
@@ -150,26 +162,26 @@ function kind::perform_kind_cluster_operation() {
             exit
         fi
     fi
-    if [[ ${ALL_CLUSTERS} == *"${KIND_CLUSTER_NAME}"* ]]; then
-        if [[ ${OPERATION} == "start" ]]; then
+    if [[ ${all_clusters} == *"${KIND_CLUSTER_NAME}"* ]]; then
+        if [[ ${operation} == "start" ]]; then
             echo
             echo "Cluster ${KIND_CLUSTER_NAME} is already created"
             echo "Reusing previously created cluster"
             echo
-        elif [[ ${OPERATION} == "restart" ]]; then
+        elif [[ ${operation} == "restart" ]]; then
             echo
             echo "Recreating cluster"
             echo
             kind::delete_cluster
             kind::create_cluster
             kind::set_current_context
-        elif [[ ${OPERATION} == "stop" ]]; then
+        elif [[ ${operation} == "stop" ]]; then
             echo
             echo "Deleting cluster"
             echo
             kind::delete_cluster
             exit
-        elif [[ ${OPERATION} == "deploy" ]]; then
+        elif [[ ${operation} == "deploy" ]]; then
             echo
             echo "Deploying Airflow to KinD"
             echo
@@ -178,19 +190,19 @@ function kind::perform_kind_cluster_operation() {
             kind::deploy_airflow_with_helm
             kind::deploy_test_kubernetes_resources
             kind::wait_for_webserver_healthy
-        elif [[ ${OPERATION} == "test" ]]; then
+        elif [[ ${operation} == "test" ]]; then
             echo
             echo "Testing with KinD"
             echo
             kind::set_current_context
             "${AIRFLOW_SOURCES}/scripts/ci/kubernetes/ci_run_kubernetes_tests.sh"
-        elif [[ ${OPERATION} == "shell" ]]; then
+        elif [[ ${operation} == "shell" ]]; then
             echo
             echo "Entering an interactive shell for kubernetes testing"
             echo
             kind::set_current_context
             "${AIRFLOW_SOURCES}/scripts/ci/kubernetes/ci_run_kubernetes_tests.sh" "-i"
-        elif [[ ${OPERATION} == "k9s" ]]; then
+        elif [[ ${operation} == "k9s" ]]; then
             echo
             echo "Starting k9s CLI"
             echo
@@ -204,30 +216,30 @@ function kind::perform_kind_cluster_operation() {
                 -v "${KUBECONFIG}:/root/.kube/config" quay.io/derailed/k9s
         else
             echo
-            echo  "${COLOR_RED}ERROR: Wrong cluster operation: ${OPERATION}. Should be one of: ${ALLOWED_KIND_OPERATIONS}  ${COLOR_RESET}"
+            echo  "${COLOR_RED}ERROR: Wrong cluster operation: ${operation}. Should be one of: ${ALLOWED_KIND_OPERATIONS}  ${COLOR_RESET}"
             echo
             exit 1
         fi
     else
-        if [[ ${OPERATION} == "start" ]]; then
+        if [[ ${operation} == "start" ]]; then
             echo
             echo "Creating cluster"
             echo
             kind::create_cluster
-        elif [[ ${OPERATION} == "recreate" ]]; then
+        elif [[ ${operation} == "recreate" ]]; then
             echo
             echo "Cluster ${KIND_CLUSTER_NAME} does not exist. Creating rather than recreating"
             echo "Creating cluster"
             echo
             kind::create_cluster
-        elif [[ ${OPERATION} == "stop" || ${OPERATION} == "deploy" || ${OPERATION} == "test" || ${OPERATION} == "shell" ]]; then
+        elif [[ ${operation} == "stop" || ${operation} == "deploy" || ${operation} == "test" || ${operation} == "shell" ]]; then
             echo
-            echo  "${COLOR_RED}ERROR: Cluster ${KIND_CLUSTER_NAME} does not exist. It should exist for ${OPERATION} operation  ${COLOR_RESET}"
+            echo  "${COLOR_RED}ERROR: Cluster ${KIND_CLUSTER_NAME} does not exist. It should exist for ${operation} operation  ${COLOR_RESET}"
             echo
             exit 1
         else
             echo
-            echo  "${COLOR_RED}ERROR: Wrong cluster operation: ${OPERATION}. Should be one of ${ALLOWED_KIND_OPERATIONS}  ${COLOR_RESET}"
+            echo  "${COLOR_RED}ERROR: Wrong cluster operation: ${operation}. Should be one of ${ALLOWED_KIND_OPERATIONS}  ${COLOR_RESET}"
             echo
             exit 1
         fi
@@ -253,19 +265,26 @@ function kind::check_cluster_ready_for_airflow() {
 
 function kind::build_image_for_kubernetes_tests() {
     cd "${AIRFLOW_SOURCES}" || exit 1
-    docker_v build --tag "${AIRFLOW_PROD_IMAGE_KUBERNETES}" . -f - <<EOF
-FROM ${AIRFLOW_PROD_IMAGE}
+    local image_tag="latest"
+    if [[ -n ${GITHUB_REGISTRY_PULL_IMAGE_TAG=} ]]; then
+        image_tag="${GITHUB_REGISTRY_PULL_IMAGE_TAG}"
+    fi
+    echo "Building ${AIRFLOW_IMAGE_KUBERNETES}:latest from ${AIRFLOW_PROD_IMAGE}:${image_tag}"
+    docker_v build --tag "${AIRFLOW_IMAGE_KUBERNETES}:latest" . -f - <<EOF
+FROM ${AIRFLOW_PROD_IMAGE}:${image_tag}
 
 COPY airflow/example_dags/ \${AIRFLOW_HOME}/dags/
 
 COPY airflow/kubernetes_executor_templates/ \${AIRFLOW_HOME}/pod_templates/
 
+ENV GUNICORN_CMD_ARGS='--preload' AIRFLOW__WEBSERVER__WORKER_REFRESH_INTERVAL=0
+
 EOF
-    echo "The ${AIRFLOW_PROD_IMAGE_KUBERNETES} is prepared for test kubernetes deployment."
+    echo "The ${AIRFLOW_IMAGE_KUBERNETES}:${image_tag} is prepared for test kubernetes deployment."
 }
 
 function kind::load_image_to_kind_cluster() {
-    kind load docker-image --name "${KIND_CLUSTER_NAME}" "${AIRFLOW_PROD_IMAGE_KUBERNETES}"
+    kind load docker-image --name "${KIND_CLUSTER_NAME}" "${AIRFLOW_IMAGE_KUBERNETES}:latest"
 }
 
 MAX_NUM_TRIES_FOR_HEALTH_CHECK=12
@@ -288,6 +307,7 @@ function kind::wait_for_webserver_healthy() {
             echo
             echo  "${COLOR_RED}ERROR: Timeout while waiting for the webserver health check  ${COLOR_RESET}"
             echo
+            return 1
         fi
     done
     echo
@@ -330,12 +350,14 @@ function kind::deploy_airflow_with_helm() {
     pushd "${chartdir}/chart" >/dev/null 2>&1 || exit 1
     helm repo add stable https://charts.helm.sh/stable/
     helm dep update
-    helm install airflow . --namespace "${HELM_AIRFLOW_NAMESPACE}" \
-        --set "defaultAirflowRepository=${DOCKERHUB_USER}/${DOCKERHUB_REPO}" \
-        --set "images.airflow.repository=${DOCKERHUB_USER}/${DOCKERHUB_REPO}" \
-        --set "images.airflow.tag=${AIRFLOW_PROD_BASE_TAG}-kubernetes" -v 1 \
-        --set "defaultAirflowTag=${AIRFLOW_PROD_BASE_TAG}-kubernetes" -v 1 \
-        --set "config.api.auth_backend=airflow.api.auth.backend.basic_auth" \
+    helm install airflow . \
+        --timeout 10m0s \
+        --namespace "${HELM_AIRFLOW_NAMESPACE}" \
+        --set "defaultAirflowRepository=${AIRFLOW_IMAGE_KUBERNETES}" \
+        --set "images.airflow.repository=${AIRFLOW_IMAGE_KUBERNETES}" \
+        --set "images.airflow.tag=latest" -v 1 \
+        --set "defaultAirflowTag=latest" -v 1 \
+        --set "config.api.auth_backends=airflow.api.auth.backend.basic_auth" \
         --set "config.logging.logging_level=DEBUG" \
         --set "executor=${EXECUTOR}"
     echo
@@ -346,4 +368,32 @@ function kind::deploy_test_kubernetes_resources() {
     verbosity::print_info "Deploying Custom kubernetes resources"
     kubectl apply -f "scripts/ci/kubernetes/volumes.yaml" --namespace default
     kubectl apply -f "scripts/ci/kubernetes/nodeport.yaml" --namespace airflow
+}
+
+function kind::upgrade_airflow_with_helm() {
+    local mode=$1
+    echo
+    echo "Upgrading airflow with ${mode}"
+    echo
+    local chartdir
+    chartdir=$(mktemp -d)
+    traps::add_trap "rm -rf ${chartdir}" EXIT INT HUP TERM
+    # Copy chart to temporary directory to allow chart deployment in parallel
+    # Otherwise helm deployment will fail on renaming charts to tmpcharts
+    cp -r "${AIRFLOW_SOURCES}/chart" "${chartdir}"
+
+    pushd "${chartdir}/chart" >/dev/null 2>&1 || exit 1
+    helm repo add stable https://charts.helm.sh/stable/
+    helm dep update
+    helm upgrade airflow . --namespace "${HELM_AIRFLOW_NAMESPACE}" \
+        --set "defaultAirflowRepository=${AIRFLOW_IMAGE_KUBERNETES}" \
+        --set "images.airflow.repository=${AIRFLOW_IMAGE_KUBERNETES}" \
+        --set "images.airflow.tag=latest" -v 1 \
+        --set "defaultAirflowTag=latest" -v 1 \
+        --set "config.api.auth_backends=airflow.api.auth.backend.basic_auth" \
+        --set "config.logging.logging_level=DEBUG" \
+        --set "executor=${mode}"
+
+    echo
+    popd > /dev/null 2>&1|| exit 1
 }

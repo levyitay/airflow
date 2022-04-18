@@ -26,12 +26,10 @@ metadata:
 spec:
   initContainers:
     - name: git-sync
-      image: "k8s.gcr.io/git-sync:v3.1.6"
+      image: "k8s.gcr.io/git-sync/git-sync:v3.4.0"
       env:
-        - name: GIT_SYNC_REV
-          value: "HEAD"
         - name: GIT_SYNC_BRANCH
-          value: "v1-10-stable"
+          value: "v2-2-stable"
         - name: GIT_SYNC_REPO
           value: "https://github.com/apache/airflow.git"
         - name: GIT_SYNC_DEPTH
@@ -42,17 +40,13 @@ spec:
           value: "repo"
         - name: GIT_SYNC_ADD_USER
           value: "true"
-        - name: GIT_SYNC_WAIT
-          value: "60"
-        - name: GIT_SYNC_MAX_SYNC_FAILURES
-          value: "0"
+        - name: GIT_SYNC_ONE_TIME
+          value: "true"
       volumeMounts:
         - name: airflow-dags
           mountPath: /git
   containers:
-    - args: []
-      command: []
-      env:
+    - env:
         - name: AIRFLOW__CORE__EXECUTOR
           value: LocalExecutor
         # Hard Coded Airflow Envs
@@ -61,7 +55,7 @@ spec:
             secretKeyRef:
               name: RELEASE-NAME-fernet-key
               key: fernet-key
-        - name: AIRFLOW__CORE__SQL_ALCHEMY_CONN
+        - name: AIRFLOW__DATABASE__SQL_ALCHEMY_CONN
           valueFrom:
             secretKeyRef:
               name: RELEASE-NAME-airflow-metadata
@@ -71,37 +65,31 @@ spec:
             secretKeyRef:
               name: RELEASE-NAME-airflow-metadata
               key: connection
-      envFrom: []
       image: dummy_image
       imagePullPolicy: IfNotPresent
       name: base
-      ports: []
       volumeMounts:
         - mountPath: "/opt/airflow/logs"
           name: airflow-logs
         - mountPath: /opt/airflow/dags
           name: airflow-dags
+          subPath: repo/airflow/example_dags
           readOnly: false
-  hostNetwork: false
+        - mountPath: /opt/airflow/airflow.cfg
+          name: airflow-config
+          readOnly: true
+          subPath: airflow.cfg
   restartPolicy: Never
   securityContext:
     runAsUser: 50000
-  nodeSelector:
-    {}
-  affinity:
-    {}
-  tolerations:
-    []
-  serviceAccountName: 'RELEASE-NAME-worker-serviceaccount'
+    fsGroup: 50000
+  serviceAccountName: "RELEASE-NAME-worker-serviceaccount"
   volumes:
     - name: airflow-dags
       emptyDir: {}
-    - emptyDir: {}
-      name: airflow-logs
+    - name: airflow-logs
+      emptyDir: {}
     - configMap:
         name: RELEASE-NAME-airflow-config
       name: airflow-config
-    - configMap:
-        name: RELEASE-NAME-airflow-config
-      name: airflow-local-settings
 # [END git_sync_template]

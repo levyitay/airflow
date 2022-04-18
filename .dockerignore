@@ -40,9 +40,6 @@
 !scripts/in_container
 !scripts/docker
 
-# Add provider packages to the context
-!provider_packages
-
 # Add tests and kubernetes_tests to context.
 !tests
 !kubernetes_tests
@@ -51,8 +48,6 @@
 !.rat-excludes
 !.flake8
 !.dockerignore
-!pylintrc
-!pylintrc-tests
 !pytest.ini
 !CHANGELOG.txt
 !LICENSE
@@ -60,6 +55,7 @@
 !NOTICE
 !.github
 !empty
+!Dockerfile
 
 # This folder is for you if you want to add any packages to the docker context when you build your own
 # docker image. most of other files and any new folder you add will be excluded by default
@@ -131,3 +127,4 @@ airflow/www/static/docs
 # Exclude docs generated files
 docs/_build/
 docs/_api/
+docs/_doctrees/

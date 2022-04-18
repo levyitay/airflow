@@ -19,7 +19,6 @@
 # under the License.
 
 """Main executable module"""
-
 import os
 
 import argcomplete
@@ -33,7 +32,6 @@ def main():
     if conf.get("core", "security") == 'kerberos':
         os.environ['KRB5CCNAME'] = conf.get('kerberos', 'ccache')
         os.environ['KRB5_KTNAME'] = conf.get('kerberos', 'keytab')
-
     parser = cli_parser.get_parser()
     argcomplete.autocomplete(parser)
     args = parser.parse_args()

@@ -22,7 +22,6 @@ from prestodb.dbapi import Cursor as PrestoCursor
 
 from airflow.providers.google.cloud.transfers.sql_to_gcs import BaseSQLToGCSOperator
 from airflow.providers.presto.hooks.presto import PrestoHook
-from airflow.utils.decorators import apply_defaults
 
 
 class _PrestoToGCSPrestoCursorAdapter:
@@ -145,7 +144,6 @@ class PrestoToGCSOperator(BaseSQLToGCSOperator):
     """Copy data from PrestoDB to Google Cloud Storage in JSON or CSV format.
 
     :param presto_conn_id: Reference to a specific Presto hook.
-    :type presto_conn_id: str
     """
 
     ui_color = "#a0e08c"
@@ -175,7 +173,6 @@ class PrestoToGCSOperator(BaseSQLToGCSOperator):
         "UUID": "STRING",
     }
 
-    @apply_defaults
     def __init__(self, *, presto_conn_id: str = "presto_default", **kwargs):
         super().__init__(**kwargs)
         self.presto_conn_id = presto_conn_id
@@ -203,8 +200,6 @@ class PrestoToGCSOperator(BaseSQLToGCSOperator):
         Do nothing. Presto uses JSON on the transport layer, so types are simple.
 
         :param value: Presto column value
-        :type value: Any
         :param schema_type: BigQuery data type
-        :type schema_type: str
         """
         return value

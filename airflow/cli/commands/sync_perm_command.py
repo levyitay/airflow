@@ -20,11 +20,11 @@ from airflow.utils import cli as cli_utils
 from airflow.www.app import cached_app
 
 
-@cli_utils.action_logging
+@cli_utils.action_cli
 def sync_perm(args):
     """Updates permissions for existing roles and DAGs"""
-    appbuilder = cached_app().appbuilder  # pylint: disable=no-member
-    print('Updating permission, view-menu for all existing roles')
+    appbuilder = cached_app().appbuilder
+    print('Updating actions and resources for all existing roles')
     # Add missing permissions for all the Base Views _before_ syncing/creating roles
     appbuilder.add_permissions(update_perms=True)
     appbuilder.sm.sync_roles()

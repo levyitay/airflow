@@ -23,6 +23,7 @@ from typing import List, Optional, Union
 from qds_sdk.commands import Command
 
 from airflow.exceptions import AirflowException
+from airflow.hooks.dbapi import DbApiHook
 from airflow.providers.qubole.hooks.qubole import QuboleHook
 
 log = logging.getLogger(__name__)
@@ -74,7 +75,7 @@ def parse_first_row(row_list) -> List[Union[bool, float, int, str]]:
     return record_list
 
 
-class QuboleCheckHook(QuboleHook):
+class QuboleCheckHook(QuboleHook, DbApiHook):
     """Qubole check hook"""
 
     def __init__(self, context, *args, **kwargs) -> None:
@@ -98,7 +99,7 @@ class QuboleCheckHook(QuboleHook):
                     log.info('Cancelling the Qubole Command Id: %s', cmd_id)
                     cmd.cancel()
 
-    def get_first(self, sql):  # pylint: disable=unused-argument
+    def get_first(self, sql):
         """Get Qubole query first record list"""
         self.execute(context=self.context)
         query_result = self.get_query_results()
@@ -112,7 +113,7 @@ class QuboleCheckHook(QuboleHook):
             cmd_id = self.cmd.id
             self.log.info("command id: %d", cmd_id)
             query_result_buffer = StringIO()
-            self.cmd.get_results(fp=query_result_buffer, inline=True, delim=COL_DELIM, arguments=[True])
+            self.cmd.get_results(fp=query_result_buffer, inline=True, delim=COL_DELIM, arguments=['true'])
             query_result = query_result_buffer.getvalue()
             query_result_buffer.close()
             return query_result

@@ -18,14 +18,16 @@
 import json
 import warnings
 from collections import OrderedDict
-from typing import Any, Callable, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Sequence
 
 from airflow.exceptions import AirflowException
 from airflow.models import BaseOperator
 from airflow.providers.apache.hive.hooks.hive import HiveMetastoreHook
 from airflow.providers.mysql.hooks.mysql import MySqlHook
 from airflow.providers.presto.hooks.presto import PrestoHook
-from airflow.utils.decorators import apply_defaults
+
+if TYPE_CHECKING:
+    from airflow.utils.context import Context
 
 
 class HiveStatsCollectionOperator(BaseOperator):
@@ -41,28 +43,24 @@ class HiveStatsCollectionOperator(BaseOperator):
             value BIGINT
         );
 
+    :param metastore_conn_id: Reference to the
+        :ref:`Hive Metastore connection id <howto/connection:hive_metastore>`.
     :param table: the source table, in the format ``database.table_name``. (templated)
-    :type table: str
     :param partition: the source partition. (templated)
-    :type partition: dict of {col:value}
     :param extra_exprs: dict of expression to run against the table where
         keys are metric names and values are Presto compatible expressions
-    :type extra_exprs: dict
     :param excluded_columns: list of columns to exclude, consider
         excluding blobs, large json columns, ...
-    :type excluded_columns: list
     :param assignment_func: a function that receives a column name and
         a type, and returns a dict of metric names and an Presto expressions.
         If None is returned, the global defaults are applied. If an
         empty dictionary is returned, no stats are computed for that
         column.
-    :type assignment_func: function
     """
 
-    template_fields = ('table', 'partition', 'ds', 'dttm')
+    template_fields: Sequence[str] = ('table', 'partition', 'ds', 'dttm')
     ui_color = '#aff7a6'
 
-    @apply_defaults
     def __init__(
         self,
         *,
@@ -115,7 +113,7 @@ class HiveStatsCollectionOperator(BaseOperator):
 
         return exp
 
-    def execute(self, context: Optional[Dict[str, Any]] = None) -> None:
+    def execute(self, context: "Context") -> None:
         metastore = HiveMetastoreHook(metastore_conn_id=self.metastore_conn_id)
         table = metastore.get_table(table_name=self.table)
         field_types = {col.name: col.type for col in table.sd.cols}
@@ -131,7 +129,7 @@ class HiveStatsCollectionOperator(BaseOperator):
             exprs.update(assign_exprs)
         exprs.update(self.extra_exprs)
         exprs = OrderedDict(exprs)
-        exprs_str = ",\n        ".join([v + " AS " + k[0] + '__' + k[1] for k, v in exprs.items()])
+        exprs_str = ",\n        ".join(v + " AS " + k[0] + '__' + k[1] for k, v in exprs.items())
 
         where_clause_ = [f"{k} = '{v}'" for k, v in self.partition.items()]
         where_clause = " AND\n        ".join(where_clause_)

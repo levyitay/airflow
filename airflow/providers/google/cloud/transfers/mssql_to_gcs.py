@@ -16,13 +16,12 @@
 # specific language governing permissions and limitations
 # under the License.
 """MsSQL to GCS operator."""
-
+import datetime
 import decimal
 from typing import Dict
 
 from airflow.providers.google.cloud.transfers.sql_to_gcs import BaseSQLToGCSOperator
 from airflow.providers.microsoft.mssql.hooks.mssql import MsSqlHook
-from airflow.utils.decorators import apply_defaults
 
 
 class MSSQLToGCSOperator(BaseSQLToGCSOperator):
@@ -30,7 +29,6 @@ class MSSQLToGCSOperator(BaseSQLToGCSOperator):
     in JSON or CSV format.
 
     :param mssql_conn_id: Reference to a specific MSSQL hook.
-    :type mssql_conn_id: str
 
     **Example**:
         The following operator will export data from the Customers table
@@ -47,13 +45,17 @@ class MSSQLToGCSOperator(BaseSQLToGCSOperator):
                 google_cloud_storage_conn_id='google_cloud_default',
                 dag=dag
             )
+
+    .. seealso::
+        For more information on how to use this operator, take a look at the guide:
+        :ref:`howto/operator:MSSQLToGCSOperator`
+
     """
 
     ui_color = '#e0a98c'
 
     type_map = {3: 'INTEGER', 4: 'TIMESTAMP', 5: 'NUMERIC'}
 
-    @apply_defaults
     def __init__(self, *, mssql_conn_id='mssql_default', **kwargs):
         super().__init__(**kwargs)
         self.mssql_conn_id = mssql_conn_id
@@ -82,7 +84,10 @@ class MSSQLToGCSOperator(BaseSQLToGCSOperator):
         """
         Takes a value from MSSQL, and converts it to a value that's safe for
         JSON/Google Cloud Storage/BigQuery.
+        Datetime, Date and Time are converted to ISO formatted strings.
         """
         if isinstance(value, decimal.Decimal):
             return float(value)
+        if isinstance(value, (datetime.date, datetime.time)):
+            return value.isoformat()
         return value

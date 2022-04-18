@@ -110,6 +110,7 @@ class TestGetConnection(TestConnectionEndpoint):
         connection_model = Connection(
             conn_id='test-connection-id',
             conn_type='mysql',
+            description='test description',
             host='mysql',
             login='login',
             schema='testschema',
@@ -127,12 +128,29 @@ class TestGetConnection(TestConnectionEndpoint):
         assert response.json == {
             "connection_id": "test-connection-id",
             "conn_type": 'mysql',
+            "description": "test description",
             "host": 'mysql',
             "login": 'login',
             'schema': 'testschema',
             'port': 80,
             'extra': "{'param': 'value'}",
         }
+
+    def test_should_mask_sensitive_values_in_extra(self, session):
+        connection_model = Connection(
+            conn_id='test-connection-id',
+            conn_type='mysql',
+            description='test description',
+            extra={"nonsensitive": "just_a_value", "api_token": "secretvalue"},
+        )
+        session.add(connection_model)
+        session.commit()
+
+        response = self.client.get(
+            "/api/v1/connections/test-connection-id", environ_overrides={'REMOTE_USER': "test"}
+        )
+
+        assert response.json['extra'] == '{"nonsensitive": "just_a_value", "api_token": "***"}'
 
     def test_should_respond_404(self):
         response = self.client.get(
@@ -168,6 +186,7 @@ class TestGetConnections(TestConnectionEndpoint):
                 {
                     "connection_id": "test-connection-id-1",
                     "conn_type": 'test_type',
+                    "description": None,
                     "host": None,
                     "login": None,
                     'schema': None,
@@ -176,6 +195,7 @@ class TestGetConnections(TestConnectionEndpoint):
                 {
                     "connection_id": "test-connection-id-2",
                     "conn_type": 'test_type',
+                    "description": None,
                     "host": None,
                     "login": None,
                     'schema': None,
@@ -203,6 +223,7 @@ class TestGetConnections(TestConnectionEndpoint):
                 {
                     "connection_id": "test-connection-id-2",
                     "conn_type": 'test_type',
+                    "description": None,
                     "host": None,
                     "login": None,
                     'schema': None,
@@ -211,6 +232,7 @@ class TestGetConnections(TestConnectionEndpoint):
                 {
                     "connection_id": "test-connection-id-1",
                     "conn_type": 'test_type',
+                    "description": None,
                     "host": None,
                     "login": None,
                     'schema': None,
@@ -365,6 +387,7 @@ class TestPatchConnection(TestConnectionEndpoint):
         assert response.json == {
             "connection_id": test_connection,  # not updated
             "conn_type": 'test_type',  # Not updated
+            "description": None,  # Not updated
             "extra": None,  # Not updated
             'login': "login",  # updated
             "port": 80,  # updated
@@ -540,6 +563,41 @@ class TestPostConnection(TestConnectionEndpoint):
     def test_should_raises_401_unauthenticated(self):
         response = self.client.post(
             "/api/v1/connections", json={"connection_id": "test-connection-id", "conn_type": 'test_type'}
+        )
+
+        assert_401(response)
+
+
+class TestConnection(TestConnectionEndpoint):
+    def test_should_respond_200(self):
+        payload = {"connection_id": "test-connection-id", "conn_type": 'sqlite'}
+        response = self.client.post(
+            "/api/v1/connections/test", json=payload, environ_overrides={'REMOTE_USER': "test"}
+        )
+        assert response.status_code == 200
+        assert response.json == {
+            'status': True,
+            'message': 'Connection successfully tested',
+        }
+
+    def test_post_should_respond_400_for_invalid_payload(self):
+        payload = {
+            "connection_id": "test-connection-id",
+        }  # conn_type missing
+        response = self.client.post(
+            "/api/v1/connections/test", json=payload, environ_overrides={'REMOTE_USER': "test"}
+        )
+        assert response.status_code == 400
+        assert response.json == {
+            'detail': "{'conn_type': ['Missing data for required field.']}",
+            'status': 400,
+            'title': 'Bad Request',
+            'type': EXCEPTIONS_LINK_MAP[400],
+        }
+
+    def test_should_raises_401_unauthenticated(self):
+        response = self.client.post(
+            "/api/v1/connections/test", json={"connection_id": "test-connection-id", "conn_type": 'test_type'}
         )
 
         assert_401(response)

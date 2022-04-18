@@ -31,25 +31,22 @@ For more information about the state of a run refer to
 https://docs.databricks.com/api/latest/jobs.html#runstate
 """
 
+from datetime import datetime
+
 from airflow import DAG
 from airflow.providers.databricks.operators.databricks import DatabricksSubmitRunOperator
-from airflow.utils.dates import days_ago
-
-default_args = {
-    'owner': 'airflow',
-    'email': ['airflow@example.com'],
-    'depends_on_past': False,
-}
 
 with DAG(
     dag_id='example_databricks_operator',
-    default_args=default_args,
     schedule_interval='@daily',
-    start_date=days_ago(2),
+    start_date=datetime(2021, 1, 1),
     tags=['example'],
+    catchup=False,
 ) as dag:
+    # [START howto_operator_databricks_json]
+    # Example of using the JSON parameter to initialize the operator.
     new_cluster = {
-        'spark_version': '2.1.0-db3-scala2.11',
+        'spark_version': '9.1.x-scala2.12',
         'node_type_id': 'r3.xlarge',
         'aws_attributes': {'availability': 'ON_DEMAND'},
         'num_workers': 8,
@@ -61,8 +58,7 @@ with DAG(
             'notebook_path': '/Users/airflow@example.com/PrepareData',
         },
     }
-    # [START howto_operator_databricks_json]
-    # Example of using the JSON parameter to initialize the operator.
+
     notebook_task = DatabricksSubmitRunOperator(task_id='notebook_task', json=notebook_task_params)
     # [END howto_operator_databricks_json]
 

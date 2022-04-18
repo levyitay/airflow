@@ -17,6 +17,7 @@ airflow/www/static/dist
 
 /logs/
 airflow-webserver.pid
+standalone_admin_password.txt
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
@@ -85,6 +86,7 @@ instance/
 
 # Sphinx documentation
 docs/_build/
+docs/rtd-deprecation/_build/
 docs/_doctrees/
 docs/_inventory_cache/
 docs/*/_api/
@@ -149,7 +151,6 @@ tramp
 rat-results.txt
 
 # Git stuff
-.gitattributes
 # Kubernetes generated templated files
 *.generated
 *.tar.gz
@@ -204,8 +205,6 @@ log.txt*
 # Terraform variables
 *.tfvars
 
-Chart.lock
-
 # Chart dependencies
 **/charts/*.tgz
 
@@ -219,3 +218,9 @@ pip-wheel-metadata
 # Dev files
 /dev/packages.txt
 /dev/Dockerfile.pmc
+
+# Generated UI licenses
+licenses/LICENSES-ui.txt
+
+# Packaged breeze on Windows
+/breeze.exe

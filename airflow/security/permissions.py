@@ -16,6 +16,7 @@
 # under the License.
 
 # Resource Constants
+RESOURCE_ACTION = "Permissions"
 RESOURCE_ADMIN_MENU = "Admin"
 RESOURCE_AIRFLOW = "Airflow"
 RESOURCE_AUDIT_LOG = "Audit Logs"
@@ -27,6 +28,7 @@ RESOURCE_DOCS_MENU = "Docs"
 RESOURCE_DOCS = "Documentation"
 RESOURCE_CONFIG = "Configurations"
 RESOURCE_CONNECTION = "Connections"
+RESOURCE_DAG_DEPENDENCIES = "DAG Dependencies"
 RESOURCE_DAG_CODE = "DAG Code"
 RESOURCE_DAG_RUN = "DAG Runs"
 RESOURCE_IMPORT_ERROR = "ImportError"
@@ -34,19 +36,20 @@ RESOURCE_JOB = "Jobs"
 RESOURCE_MY_PASSWORD = "My Password"
 RESOURCE_MY_PROFILE = "My Profile"
 RESOURCE_PASSWORD = "Passwords"
-RESOURCE_PERMISSION = "Permissions"
-RESOURCE_PERMISSION_VIEW = "Permission Views"  # Refers to a Perm <-> View mapping, not an MVC View.
+RESOURCE_PERMISSION = "Permission Views"  # Refers to a Perm <-> View mapping, not an MVC View.
 RESOURCE_POOL = "Pools"
 RESOURCE_PLUGIN = "Plugins"
+RESOURCE_PROVIDER = "Providers"
+RESOURCE_RESOURCE = "View Menus"
 RESOURCE_ROLE = "Roles"
 RESOURCE_SLA_MISS = "SLA Misses"
 RESOURCE_TASK_INSTANCE = "Task Instances"
 RESOURCE_TASK_LOG = "Task Logs"
 RESOURCE_TASK_RESCHEDULE = "Task Reschedules"
+RESOURCE_TRIGGER = "Triggers"
 RESOURCE_USER = "Users"
 RESOURCE_USER_STATS_CHART = "User Stats Chart"
 RESOURCE_VARIABLE = "Variables"
-RESOURCE_VIEW_MENU = "View Menus"
 RESOURCE_WEBSITE = "Website"
 RESOURCE_XCOM = "XComs"
 
@@ -60,7 +63,7 @@ ACTION_CAN_ACCESS_MENU = "menu_access"
 DEPRECATED_ACTION_CAN_DAG_READ = "can_dag_read"
 DEPRECATED_ACTION_CAN_DAG_EDIT = "can_dag_edit"
 
-DAG_PERMS = {ACTION_CAN_READ, ACTION_CAN_EDIT}
+DAG_ACTIONS = {ACTION_CAN_READ, ACTION_CAN_EDIT, ACTION_CAN_DELETE}
 
 
 def resource_name_for_dag(dag_id):
@@ -70,4 +73,7 @@ def resource_name_for_dag(dag_id):
 
     if dag_id.startswith(RESOURCE_DAG_PREFIX):
         return dag_id
-    return f"{RESOURCE_DAG_PREFIX}{dag_id}"
+
+    # To account for SubDags
+    root_dag_id = dag_id.split(".")[0]
+    return f"{RESOURCE_DAG_PREFIX}{root_dag_id}"

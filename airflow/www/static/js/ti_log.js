@@ -17,13 +17,15 @@
  * under the License.
  */
 
-/* global document, window, $, */
+/* global document, window, $, moment, Airflow */
 import { escapeHtml } from './main';
-import getMetaValue from './meta_value';
+import { getMetaValue } from './utils';
+import { formatDateTime } from './datetime_utils';
 
 const executionDate = getMetaValue('execution_date');
 const dagId = getMetaValue('dag_id');
 const taskId = getMetaValue('task_id');
+const mapIndex = getMetaValue('map_index');
 const logsWithMetadataUrl = getMetaValue('logs_with_metadata_url');
 const DELAY = parseInt(getMetaValue('delay'), 10);
 const AUTO_TAILING_OFFSET = parseInt(getMetaValue('auto_tailing_offset'), 10);
@@ -59,8 +61,9 @@ window.scrollBottomLogs = scrollBottom;
 
 // Streaming log with auto-tailing.
 function autoTailingLog(tryNumber, metadata = null, autoTailing = false) {
-  console.debug(`Auto-tailing log for dag_id: ${dagId}, task_id: ${taskId}, \
-   execution_date: ${executionDate}, try_number: ${tryNumber}, metadata: ${JSON.stringify(metadata)}`);
+  console.debug(`Auto-tailing log for dag_id: ${dagId}, task_id: ${taskId}, `
+   + `execution_date: ${executionDate}, map_index: ${mapIndex}, try_number: ${tryNumber}, `
+   + `metadata: ${JSON.stringify(metadata)}`);
 
   return Promise.resolve(
     $.ajax({
@@ -68,6 +71,7 @@ function autoTailingLog(tryNumber, metadata = null, autoTailing = false) {
       data: {
         dag_id: dagId,
         task_id: taskId,
+        map_index: mapIndex,
         execution_date: executionDate,
         try_number: tryNumber,
         metadata: JSON.stringify(metadata),
@@ -96,8 +100,9 @@ function autoTailingLog(tryNumber, metadata = null, autoTailing = false) {
         shouldScroll = true;
       }
 
-      // Detect urls
-      const urlRegex = /http(s)?:\/\/[\w\.\-]+(\.?:[\w\.\-]+)*([\/?#][\w\-\._~:/?#[\]@!\$&'\(\)\*\+,;=\.%]+)?/g;
+      // Detect urls and log timestamps
+      const urlRegex = /http(s)?:\/\/[\w.-]+(\.?:[\w.-]+)*([/?#][\w\-._~:/?#[\]@!$&'()*+,;=.%]+)?/g;
+      const dateRegex = /\d{4}[./-]\d{2}[./-]\d{2} \d{2}:\d{2}:\d{2},\d{3}/g;
 
       res.message.forEach((item) => {
         const logBlockElementId = `try-${tryNumber}-${item[0]}`;
@@ -113,7 +118,10 @@ function autoTailingLog(tryNumber, metadata = null, autoTailing = false) {
 
         // The message may contain HTML, so either have to escape it or write it as text.
         const escapedMessage = escapeHtml(item[1]);
-        const linkifiedMessage = escapedMessage.replace(urlRegex, (url) => `<a href="${url}" target="_blank">${url}</a>`);
+        const tzOffset = moment().tz(Airflow.serverTimezone).format('Z');
+        const linkifiedMessage = escapedMessage
+          .replace(urlRegex, (url) => `<a href="${url}" target="_blank">${url}</a>`)
+          .replaceAll(dateRegex, (date) => `<time datetime="${date}${tzOffset}">${formatDateTime(`${date}${tzOffset}`)}</time>`);
         logBlock.innerHTML += `${linkifiedMessage}\n`;
       });
 
@@ -132,6 +140,24 @@ function autoTailingLog(tryNumber, metadata = null, autoTailing = false) {
     ));
   });
 }
+
+function setDownloadUrl(tryNumber) {
+  if (!tryNumber) {
+    // default to the currently selected tab
+    tryNumber = $('#ti_log_try_number_list .active a').data('try-number');
+  }
+  const query = new URLSearchParams({
+    dag_id: dagId,
+    task_id: taskId,
+    execution_date: executionDate,
+    try_number: tryNumber,
+    metadata: 'null',
+    format: 'file',
+  });
+  const url = `${logsWithMetadataUrl}?${query}`;
+  $('#ti_log_download_active').attr('href', url);
+}
+
 $(document).ready(() => {
   // Lazily load all past task instance logs.
   // TODO: We only need to have recursive queries for
@@ -145,4 +171,10 @@ $(document).ready(() => {
     const autoTailing = i === TOTAL_ATTEMPTS;
     autoTailingLog(i, null, autoTailing);
   }
+
+  setDownloadUrl();
+  $('#ti_log_try_number_list a').click(function () {
+    const tryNumber = $(this).data('try-number');
+    setDownloadUrl(tryNumber);
+  });
 });

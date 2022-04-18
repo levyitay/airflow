@@ -55,10 +55,10 @@ Follow the guidelines when writing unit tests:
 **NOTE:** We plan to convert all unit tests to standard "asserts" semi-automatically, but this will be done later
 in Airflow 2.0 development phase. That will include setUp/tearDown/context managers and decorators.
 
-Running Unit Tests from IDE
----------------------------
+Running Unit Tests from PyCharm IDE
+-----------------------------------
 
-To run unit tests from the IDE, create the `local virtualenv <LOCAL_VIRTUALENV.rst>`_,
+To run unit tests from the PyCharm IDE, create the `local virtualenv <LOCAL_VIRTUALENV.rst>`_,
 select it as the default project's environment, then configure your test runner:
 
 .. image:: images/configure_test_runner.png
@@ -75,6 +75,38 @@ and run unit tests as follows:
 (with no Breeze installed) if they do not have dependencies such as
 Postgres/MySQL/Hadoop/etc.
 
+Running Unit Tests from Visual Studio Code
+------------------------------------------
+
+To run unit tests from the Visual Studio Code:
+
+1. Using the ``Extensions`` view install Python extension, reload if required
+
+.. image:: images/vscode_install_python_extension.png
+    :align: center
+    :alt: Installing Python extension
+
+2. Using the ``Testing`` view click on ``Configure Python Tests`` and select ``pytest`` framework
+
+.. image:: images/vscode_configure_python_tests.png
+    :align: center
+    :alt: Configuring Python tests
+
+.. image:: images/vscode_select_pytest_framework.png
+    :align: center
+    :alt: Selecting pytest framework
+
+3. Open ``/.vscode/settings.json`` and add ``"python.testing.pytestArgs": ["tests"]`` to enable tests discovery
+
+.. image:: images/vscode_add_pytest_settings.png
+    :align: center
+    :alt: Enabling tests discovery
+
+4. Now you are able to run and debug tests from both the ``Testing`` view and test files
+
+.. image:: images/vscode_run_tests.png
+    :align: center
+    :alt: Running tests
 
 Running Unit Tests
 --------------------------------
@@ -136,19 +168,19 @@ to breeze.
 
 .. code-block:: bash
 
-     ./breeze tests tests/providers/http/hooks/test_http.py tests/core/test_core.py --db-reset -- --log-cli-level=DEBUG
+     ./breeze-legacy tests tests/providers/http/hooks/test_http.py tests/core/test_core.py --db-reset -- --log-cli-level=DEBUG
 
 You can run the whole test suite without adding the test target:
 
 .. code-block:: bash
 
-    ./breeze tests --db-reset
+    ./breeze-legacy tests --db-reset
 
 You can also specify individual tests or a group of tests:
 
 .. code-block:: bash
 
-    ./breeze tests --db-reset tests/core/test_core.py::TestCore
+    ./breeze-legacy tests --db-reset tests/core/test_core.py::TestCore
 
 
 Running Tests of a specified type from the Host
@@ -169,13 +201,13 @@ kinds of test types:
 
   .. code-block:: bash
 
-       ./breeze --test-type Core  --db-reset tests
+       ./breeze-legacy --test-type Core  --db-reset tests
 
   Runs all provider tests:
 
   .. code-block:: bash
 
-       ./breeze --test-type Providers --db-reset tests
+       ./breeze-legacy --test-type Providers --db-reset tests
 
 * Special kinds of tests - Integration, Quarantined, Postgres, MySQL, which are marked with pytest
   marks and for those you need to select the type using test-type switch. If you want to run such tests
@@ -187,24 +219,25 @@ kinds of test types:
 
   .. code-block:: bash
 
-       ./breeze --test-type Quarantined tests tests/cli/commands/test_task_command.py --db-reset
+       ./breeze-legacy --test-type Quarantined tests tests/cli/commands/test_task_command.py --db-reset
 
   Run all Quarantined tests:
 
   .. code-block:: bash
 
-       ./breeze --test-type Quarantined tests --db-reset
+       ./breeze-legacy --test-type Quarantined tests --db-reset
 
 Helm Unit Tests
 ===============
 
 On the Airflow Project, we have decided to stick with pythonic testing for our Helm chart. This makes our chart
 easier to test, easier to modify, and able to run with the same testing infrastructure. To add Helm unit tests
-go to the ``chart/tests`` directory and add your unit test by creating a class that extends ``unittest.TestCase``
+add them in ``tests/charts``.
 
 .. code-block:: python
 
     class TestBaseChartTest(unittest.TestCase):
+        ...
 
 To render the chart create a YAML string with the nested dictionary of options you wish to test. You can then
 use our ``render_chart`` function to render the object of interest into a testable Python dictionary. Once the chart
@@ -216,7 +249,7 @@ Example test here:
 
 .. code-block:: python
 
-    from .helm_template_generator import render_chart, render_k8s_object
+    from tests.charts.helm_template_generator import render_chart, render_k8s_object
 
     git_sync_basic = """
     dags:
@@ -226,11 +259,13 @@ Example test here:
 
 
     class TestGitSyncScheduler(unittest.TestCase):
-
         def test_basic(self):
             helm_settings = yaml.safe_load(git_sync_basic)
-            res = render_chart('GIT-SYNC', helm_settings,
-                               show_only=["templates/scheduler/scheduler-deployment.yaml"])
+            res = render_chart(
+                "GIT-SYNC",
+                helm_settings,
+                show_only=["templates/scheduler/scheduler-deployment.yaml"],
+            )
             dep: k8s.V1Deployment = render_k8s_object(res[0], k8s.V1Deployment)
             assert "dags" == dep.spec.template.spec.volumes[1].name
 
@@ -238,7 +273,7 @@ To run tests using breeze run the following command
 
 .. code-block:: bash
 
-    ./breeze --test-type Helm tests
+    ./breeze-legacy --test-type Helm tests
 
 Airflow Integration Tests
 =========================
@@ -251,7 +286,7 @@ Enabling Integrations
 ---------------------
 
 Airflow integration tests cannot be run in the local virtualenv. They can only run in the Breeze
-environment with enabled integrations and in the CI. See `<CI.yml>`_ for details about Airflow CI.
+environment with enabled integrations and in the CI. See `<.github/workflows/ci.yml>`_ for details about Airflow CI.
 
 When you are in the Breeze environment, by default, all integrations are disabled. This enables only true unit tests
 to be executed in Breeze. You can enable the integration by passing the ``--integration <INTEGRATION>``
@@ -292,19 +327,19 @@ To start the ``mongo`` integration only, enter:
 
 .. code-block:: bash
 
-    ./breeze --integration mongo
+    breeze --integration mongo
 
 To start ``mongo`` and ``cassandra`` integrations, enter:
 
 .. code-block:: bash
 
-    ./breeze --integration mongo --integration cassandra
+    breeze --integration mongo --integration cassandra
 
 To start all integrations, enter:
 
 .. code-block:: bash
 
-    ./breeze --integration all
+    breeze --integration all
 
 In the CI environment, integrations can be enabled by specifying the ``ENABLED_INTEGRATIONS`` variable
 storing a space-separated list of integrations to start. Thanks to that, we can run integration and
@@ -327,10 +362,10 @@ Example of the ``redis`` integration test:
 
     @pytest.mark.integration("redis")
     def test_real_ping(self):
-        hook = RedisHook(redis_conn_id='redis_default')
+        hook = RedisHook(redis_conn_id="redis_default")
         redis = hook.get_conn()
 
-        assert redis.ping(), 'Connection to Redis with PING works.'
+        assert redis.ping(), "Connection to Redis with PING works."
 
 The markers can be specified at the test level or the class level (then all tests in this class
 require an integration). You can add multiple markers with different integrations for tests that
@@ -446,7 +481,7 @@ test in parallel. This way we can decrease the time of running all tests in self
 .. note::
 
   We need to split tests manually into separate suites rather than utilise
-  ``pytest-xdist`` or ``pytest-parallel`` which could ba a simpler and much more "native" parallelization
+  ``pytest-xdist`` or ``pytest-parallel`` which could be a simpler and much more "native" parallelization
   mechanism. Unfortunately, we cannot utilise those tools because our tests are not truly ``unit`` tests that
   can run in parallel. A lot of our tests rely on shared databases - and they update/reset/cleanup the
   databases while they are executing. They are also exercising features of the Database such as locking which
@@ -475,7 +510,7 @@ more than 30 minutes on the same machine when tests are run sequentially.
 
   On MacOS you might have less CPUs and less memory available to run the tests than you have in the host,
   simply because your Docker engine runs in a Linux Virtual Machine under-the-hood. If you want to make
-  use of the paralllelism and memory usage for the CI tests you might want to increase the resources available
+  use of the parallelism and memory usage for the CI tests you might want to increase the resources available
   to your docker engine. See the `Resources <https://docs.docker.com/docker-for-mac/#resources>`_ chapter
   in the ``Docker for Mac`` documentation on how to do it.
 
@@ -524,7 +559,7 @@ need to run the following steps:
 
 .. code-block:: bash
 
-     ./breeze prepare-provider-packages [PACKAGE ...]
+     ./breeze-legacy prepare-provider-packages [PACKAGE ...]
 
 If you run this command without packages, you will prepare all packages. However, You can specify
 providers that you would like to build if you just want to build few provider packages.
@@ -535,7 +570,7 @@ before running, so you should run it before generating ``apache-airflow`` packag
 
 .. code-block:: bash
 
-     ./breeze prepare-airflow-packages
+     ./breeze-legacy prepare-airflow-packages
 
 This prepares airflow .whl package in the dist folder.
 
@@ -545,7 +580,7 @@ This installs airflow and enters
 
 .. code-block:: bash
 
-     ./breeze --use-airflow-version wheel --use-packages-from-dist --skip-mounting-local-sources
+     ./breeze-legacy --use-airflow-version wheel --use-packages-from-dist --skip-mounting-local-sources
 
 
 
@@ -567,7 +602,7 @@ For your testing, you manage Kind cluster with ``kind-cluster`` breeze command:
 
 .. code-block:: bash
 
-    ./breeze kind-cluster [ start | stop | recreate | status | deploy | test | shell | k9s ]
+    ./breeze-legacy kind-cluster [ start | stop | recreate | status | deploy | test | shell | k9s ]
 
 The command allows you to start/stop/recreate/status Kind Kubernetes cluster, deploy Airflow via Helm
 chart as well as interact with the cluster (via test and shell commands).
@@ -588,11 +623,11 @@ Deploying Airflow to the Kubernetes cluster created is also done via ``kind-clus
 
 .. code-block:: bash
 
-    ./breeze kind-cluster deploy
+    ./breeze-legacy kind-cluster deploy
 
 The deploy command performs those steps:
 
-1. It rebuilds the latest ``apache/airflow:master-pythonX.Y`` production images using the
+1. It rebuilds the latest ``apache/airflow:main-pythonX.Y`` production images using the
    latest sources using local caching. It also adds example DAGs to the image, so that they do not
    have to be mounted inside.
 2. Loads the image to the Kind Cluster using the ``kind load`` command.
@@ -600,6 +635,17 @@ The deploy command performs those steps:
 4. Forwards Local 8080 port to the webserver running in the cluster
 5. Applies the volumes.yaml to get the volumes deployed to ``default`` namespace - this is where
    KubernetesExecutor starts its pods.
+
+You can also specify a different executor by providing the ``--executor`` optional argument:
+
+.. code-block:: bash
+
+    ./breeze-legacy kind-cluster deploy --executor CeleryExecutor
+
+Note that when you specify the ``--executor`` option, it becomes the default. Therefore, every other operations
+on ``./breeze-legacy kind-cluster`` will default to using this executor. To change that, use the ``--executor`` option on the
+subsequent commands too.
+
 
 Running tests with Kubernetes Cluster
 -------------------------------------
@@ -611,6 +657,8 @@ Running Kubernetes tests via shell:
 
 .. code-block:: bash
 
+      export EXECUTOR="KubernetesExecutor" ## can be also CeleryExecutor or CeleryKubernetesExecutor
+
       ./scripts/ci/kubernetes/ci_run_kubernetes_tests.sh                      - runs all kubernetes tests
       ./scripts/ci/kubernetes/ci_run_kubernetes_tests.sh TEST [TEST ...]      - runs selected kubernetes tests (from kubernetes_tests folder)
 
@@ -619,9 +667,15 @@ Running Kubernetes tests via breeze:
 
 .. code-block:: bash
 
-      ./breeze kind-cluster test
-      ./breeze kind-cluster test -- TEST TEST [TEST ...]
+      ./breeze-legacy kind-cluster test
+      ./breeze-legacy kind-cluster test -- TEST TEST [TEST ...]
 
+Optionally add ``--executor``:
+
+.. code-block:: bash
+
+      ./breeze-legacy kind-cluster test --executor CeleryExecutor
+      ./breeze-legacy kind-cluster test -- TEST TEST [TEST ...] --executor CeleryExecutor
 
 Entering shell with Kubernetes Cluster
 --------------------------------------
@@ -637,13 +691,23 @@ in the host.
 
 You can enter the shell via those scripts
 
+.. code-block:: bash
+
+      export EXECUTOR="KubernetesExecutor" ## can be also CeleryExecutor or CeleryKubernetesExecutor
+
       ./scripts/ci/kubernetes/ci_run_kubernetes_tests.sh [-i|--interactive]   - Activates virtual environment ready to run tests and drops you in
       ./scripts/ci/kubernetes/ci_run_kubernetes_tests.sh [--help]             - Prints this help message
 
 
 .. code-block:: bash
 
-      ./breeze kind-cluster shell
+      ./breeze-legacy kind-cluster shell
+
+Optionally add ``--executor``:
+
+.. code-block:: bash
+
+      ./breeze-legacy kind-cluster shell --executor CeleryExecutor
 
 
 K9s CLI - debug Kubernetes in style!
@@ -670,7 +734,7 @@ You can enter the k9s tool via breeze (after you deployed Airflow):
 
 .. code-block:: bash
 
-      ./breeze kind-cluster k9s
+      ./breeze-legacy kind-cluster k9s
 
 You can exit k9s by pressing Ctrl-C.
 
@@ -683,20 +747,18 @@ The typical session for tests with Kubernetes looks like follows:
 
 .. code-block:: bash
 
-    ./breeze kind-cluster start
+    ./breeze-legacy kind-cluster start
 
     Starts Kind Kubernetes cluster
 
        Use CI image.
 
-       Branch name:             master
-       Docker image:            apache/airflow:master-python3.7-ci
+       Branch name:             main
+       Docker image:            apache/airflow:main-python3.7-ci
 
        Airflow source version:  2.0.0.dev0
        Python version:          3.7
-       DockerHub user:          apache
-       DockerHub repo:          airflow
-       Backend:                 postgres 9.6
+       Backend:                 postgres 10
 
     No kind clusters found.
 
@@ -725,20 +787,18 @@ The typical session for tests with Kubernetes looks like follows:
 
 .. code-block:: bash
 
-    ./breeze kind-cluster status
+    ./breeze-legacy kind-cluster status
 
     Checks status of Kind Kubernetes cluster
 
        Use CI image.
 
-       Branch name:             master
-       Docker image:            apache/airflow:master-python3.7-ci
+       Branch name:             main
+       Docker image:            apache/airflow:main-python3.7-ci
 
        Airflow source version:  2.0.0.dev0
        Python version:          3.7
-       DockerHub user:          apache
-       DockerHub repo:          airflow
-       Backend:                 postgres 9.6
+       Backend:                 postgres 10
 
     airflow-python-3.7-v1.17.0-control-plane
     airflow-python-3.7-v1.17.0-worker
@@ -747,7 +807,7 @@ The typical session for tests with Kubernetes looks like follows:
 
 .. code-block:: bash
 
-    ./breeze kind-cluster deploy
+    ./breeze-legacy kind-cluster deploy
 
 4. Run Kubernetes tests
 
@@ -761,7 +821,7 @@ The virtualenv required will be created automatically when the scripts are run.
 
 .. code-block:: bash
 
-    ./breeze kind-cluster test
+    ./breeze-legacy kind-cluster test
 
 
 4b) You can enter an interactive shell to run tests one-by-one
@@ -770,7 +830,7 @@ This prepares and enters the virtualenv in ``.build/.kubernetes_venv_<YOUR_CURRE
 
 .. code-block:: bash
 
-    ./breeze kind-cluster shell
+    ./breeze-legacy kind-cluster shell
 
 Once you enter the environment, you receive this information:
 
@@ -792,7 +852,7 @@ In a separate terminal you can open the k9s CLI:
 
 .. code-block:: bash
 
-    ./breeze kind-cluster k9s
+    ./breeze-legacy kind-cluster k9s
 
 Use it to observe what's going on in your cluster.
 
@@ -800,7 +860,7 @@ Use it to observe what's going on in your cluster.
 
 It is very easy to running/debug Kubernetes tests with IntelliJ/PyCharm. Unlike the regular tests they are
 in ``kubernetes_tests`` folder and if you followed the previous steps and entered the shell using
-``./breeze kind-cluster shell`` command, you can setup your IDE very easy to run (and debug) your
+``./breeze-legacy kind-cluster shell`` command, you can setup your IDE very easy to run (and debug) your
 tests using the standard IntelliJ Run/Debug feature. You just need a few steps:
 
 a) Add the virtualenv as interpreter for the project:
@@ -829,7 +889,7 @@ c) Run/Debug tests using standard "Run/Debug" feature of IntelliJ
 NOTE! The first time you run it, it will likely fail with
 ``kubernetes.config.config_exception.ConfigException``:
 ``Invalid kube-config file. Expected key current-context in kube-config``. You need to add KUBECONFIG
-environment variable copying it from the result of "./breeze kind-cluster test":
+environment variable copying it from the result of "./breeze-legacy kind-cluster test":
 
 .. code-block:: bash
 
@@ -887,14 +947,14 @@ Airflow to the cluster.
 
 .. code-block:: bash
 
-    ./breeze kind-cluster deploy
+    ./breeze-legacy kind-cluster deploy
 
 
 7. Stop KinD cluster when you are done
 
 .. code-block:: bash
 
-    ./breeze kind-cluster stop
+    ./breeze-legacy kind-cluster stop
 
 
 Airflow System Tests
@@ -1020,12 +1080,12 @@ Preparing provider packages for System Tests for Airflow 1.10.* series
 ----------------------------------------------------------------------
 
 To run system tests with the older Airflow version, you need to prepare provider packages. This
-can be done by running ``./breeze prepare-provider-packages <PACKAGES TO BUILD>``. For
+can be done by running ``./breeze-legacy prepare-provider-packages <PACKAGES TO BUILD>``. For
 example, the below command will build google, postgres and mysql wheel packages:
 
 .. code-block:: bash
 
-  ./breeze prepare-provider-packages -- google postgres mysql
+  ./breeze-legacy prepare-provider-packages -- google postgres mysql
 
 Those packages will be prepared in ./dist folder. This folder is mapped to /dist folder
 when you enter Breeze, so it is easy to automate installing those packages for testing.
@@ -1039,14 +1099,16 @@ Here is the typical session that you need to do to run system tests:
 
 .. code-block:: bash
 
-   ./breeze --python 3.6 --db-reset --forward-credentials restart
+   breeze stop
+   breeze --python 3.7 --db-reset --forward-credentials
 
 This will:
 
-* restarts the whole environment (i.e. recreates metadata database from the scratch)
-* run Breeze with python 3.6 version
-* reset the Airflow database
-* forward your local credentials to Breeze
+* stop the whole environment (i.e. recreates metadata database from the scratch)
+* run Breeze with:
+  * python 3.7 version
+  * resetting the Airflow database
+  * forward your local credentials to Breeze
 
 3. Run the tests:
 
@@ -1054,7 +1116,6 @@ This will:
 
    pytest -o faulthandler_timeout=2400 \
       --system=google tests/providers/google/cloud/operators/test_compute_system.py
-
 
 Iteration with System Tests if your resources are slow to create
 ----------------------------------------------------------------
@@ -1094,7 +1155,8 @@ Breeze session. They are usually expensive to run.
 
 .. code-block:: bash
 
-   ./breeze --python 3.6 --db-reset --forward-credentials restart
+    breeze stop
+    breeze --python 3.6 --db-reset --forward-credentials
 
 2. Run create action in helper (to create slowly created resources):
 
@@ -1188,7 +1250,7 @@ Below are the steps you need to take to set up your virtual machine in the Googl
         --zone="${GCP_ZONE}" \
         --machine-type=f1-micro \
         --subnet="${GCP_NETWORK_NAME}" \
-        --image=debian-10-buster-v20200210 \
+        --image=debian-11-bullseye-v20220120 \
         --image-project=debian-cloud \
         --preemptible
 
@@ -1247,10 +1309,9 @@ It will run a backfill job:
 
 .. code-block:: python
 
-  if __name__ == '__main__':
-    from airflow.utils.state import State
-    dag.clear(dag_run_state=State.NONE)
-    dag.run()
+  if __name__ == "__main__":
+      dag.clear()
+      dag.run()
 
 
 2. Set up ``AIRFLOW__CORE__EXECUTOR=DebugExecutor`` in the run configuration of your IDE.
@@ -1273,7 +1334,7 @@ By default ``/files/dags`` folder is mounted from your local ``<AIRFLOW_SOURCES>
 the directory used by airflow scheduler and webserver to scan dags for. You can place your dags there
 to test them.
 
-The DAGs can be run in the master version of Airflow but they also work
+The DAGs can be run in the main version of Airflow but they also work
 with older versions.
 
 To run the tests for Airflow 1.10.* series, you need to run Breeze with
@@ -1312,53 +1373,3 @@ On the screen you will see database queries for the given test.
 
 SQL query tracking does not work properly if your test runs subprocesses. Only queries from the main process
 are tracked.
-
-BASH Unit Testing (BATS)
-========================
-
-We have started adding tests to cover Bash scripts we have in our codebase.
-The tests are placed in the ``tests\bats`` folder.
-They require BAT CLI to be installed if you want to run them on your
-host or via a Docker image.
-
-Installing BATS CLI
----------------------
-
-You can find an installation guide as well as information on how to write
-the bash tests in `BATS Installation <https://github.com/bats-core/bats-core#installation>`_.
-
-Running BATS Tests on the Host
-------------------------------
-
-To run all tests:
-
-.. code-block:: bash
-
-   bats -r tests/bats/
-
-To run a single test:
-
-.. code-block:: bash
-
-   bats tests/bats/your_test_file.bats
-
-Running BATS Tests via Docker
------------------------------
-
-To run all tests:
-
-.. code-block:: bash
-
-   docker run -it --workdir /airflow -v $(pwd):/airflow  bats/bats:latest -r /airflow/tests/bats
-
-To run a single test:
-
-.. code-block:: bash
-
-   docker run -it --workdir /airflow -v $(pwd):/airflow  bats/bats:latest /airflow/tests/bats/your_test_file.bats
-
-Using BATS
-----------
-
-You can read more about using BATS CLI and writing tests in
-`BATS Usage <https://github.com/bats-core/bats-core#usage>`_.

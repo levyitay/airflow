@@ -15,10 +15,12 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
-from typing import Any, Dict, List, Tuple
+from typing import TYPE_CHECKING, Any, List, Sequence, Tuple
 
 from airflow.sensors.base import BaseSensorOperator
-from airflow.utils.decorators import apply_defaults
+
+if TYPE_CHECKING:
+    from airflow.utils.context import Context
 
 
 class NamedHivePartitionSensor(BaseSensorOperator):
@@ -32,17 +34,14 @@ class NamedHivePartitionSensor(BaseSensorOperator):
         Thrift client ``get_partitions_by_name`` method. Note that
         you cannot use logical or comparison operators as in
         HivePartitionSensor.
-    :type partition_names: list[str]
-    :param metastore_conn_id: reference to the metastore thrift service
-        connection id
-    :type metastore_conn_id: str
+    :param metastore_conn_id: Reference to the
+        :ref:`metastore thrift service connection id <howto/connection:hive_metastore>`.
     """
 
-    template_fields = ('partition_names',)
+    template_fields: Sequence[str] = ('partition_names',)
     ui_color = '#8d99ae'
     poke_context_fields = ('partition_names', 'metastore_conn_id')
 
-    @apply_defaults
     def __init__(
         self,
         *,
@@ -94,7 +93,7 @@ class NamedHivePartitionSensor(BaseSensorOperator):
         self.log.info('Poking for %s.%s/%s', schema, table, partition)
         return self.hook.check_for_named_partition(schema, table, partition)
 
-    def poke(self, context: Dict[str, Any]) -> bool:
+    def poke(self, context: "Context") -> bool:
 
         number_of_partitions = len(self.partition_names)
         poke_index_start = self.next_index_to_poke

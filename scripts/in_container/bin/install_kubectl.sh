@@ -33,7 +33,8 @@ if command -v kubectl; then
 fi
 
 KUBECTL_VERSION="$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)"
-DOWNLOAD_URL="https://storage.googleapis.com/kubernetes-release/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl"
+KUBECTL_PLATFORM=$([ "$(uname -m)" = "aarch64" ] && echo "arm64" || echo "amd64" )
+DOWNLOAD_URL="https://storage.googleapis.com/kubernetes-release/release/${KUBECTL_VERSION}/bin/linux/${KUBECTL_PLATFORM}/kubectl"
 
 if [[ -e ${BIN_PATH} ]]; then
     echo "The binary file (${BIN_PATH}) already exists. This may mean kubectl is already installed."
@@ -46,7 +47,7 @@ echo "Downloading from ${DOWNLOAD_URL}"
 curl -# --fail "${DOWNLOAD_URL}" --output "${BIN_PATH}"
 chmod +x "${BIN_PATH}"
 
-# Sanity check
+# Coherence check
 if ! command -v kubectl > /dev/null; then
     echo 'Installation failed. The command "kubectl" was not found.'
     exit 1

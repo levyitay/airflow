@@ -24,7 +24,7 @@ import sys
 from typing import List, Optional
 from urllib.parse import urlsplit, urlunsplit
 
-import requests
+import httpx
 import tenacity
 
 from airflow import configuration
@@ -54,7 +54,7 @@ class Anonymizer(Protocol):
 class NullAnonymizer(Anonymizer):
     """Do nothing."""
 
-    def _identity(self, value):
+    def _identity(self, value) -> str:
         return value
 
     process_path = process_username = process_url = _identity
@@ -70,19 +70,19 @@ class PiiAnonymizer(Anonymizer):
         username = getuser()
         self._path_replacements = {home_path: "${HOME}", username: "${USER}"}
 
-    def process_path(self, value):
+    def process_path(self, value) -> str:
         if not value:
             return value
         for src, target in self._path_replacements.items():
             value = value.replace(src, target)
         return value
 
-    def process_username(self, value):
+    def process_username(self, value) -> str:
         if not value:
             return value
         return value[0] + "..." + value[-1]
 
-    def process_url(self, value):
+    def process_url(self, value) -> str:
         if not value:
             return value
 
@@ -214,14 +214,14 @@ class AirflowInfo:
         try:
             handler_names = [get_fullname(handler) for handler in logging.getLogger('airflow.task').handlers]
             return ", ".join(handler_names)
-        except Exception:  # noqa pylint: disable=broad-except
+        except Exception:
             return "NOT AVAILABLE"
 
     @property
     def _airflow_info(self):
         executor = configuration.conf.get("core", "executor")
         sql_alchemy_conn = self.anonymizer.process_url(
-            configuration.conf.get("core", "SQL_ALCHEMY_CONN", fallback="NOT AVAILABLE")
+            configuration.conf.get("database", "SQL_ALCHEMY_CONN", fallback="NOT AVAILABLE")
         )
         dags_folder = self.anonymizer.process_path(
             configuration.conf.get("core", "dags_folder", fallback="NOT AVAILABLE")
@@ -304,7 +304,7 @@ class AirflowInfo:
 
     @property
     def _providers_info(self):
-        return [(p.provider_info['package-name'], p.version) for p in ProvidersManager().providers.values()]
+        return [(p.data['package-name'], p.version) for p in ProvidersManager().providers.values()]
 
     def show(self, output: str, console: Optional[AirflowConsole] = None) -> None:
         """Shows information about Airflow instance"""
@@ -349,8 +349,8 @@ class FileIoException(Exception):
 )
 def _upload_text_to_fileio(content):
     """Upload text file to File.io service and return lnk"""
-    resp = requests.post("https://file.io", data={"text": content})
-    if not resp.ok:
+    resp = httpx.post("https://file.io", content=content)
+    if resp.status_code not in [200, 201]:
         print(resp.json())
         raise FileIoException("Failed to send report to file.io service.")
     try:

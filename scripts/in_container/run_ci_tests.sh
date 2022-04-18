@@ -27,8 +27,19 @@ pytest "${@}"
 
 RES=$?
 
+if [[ ${RES} == "139" ]]; then
+    echo "${COLOR_YELLOW}Sometimes Pytest fails at exiting with segfault, but all tests actually passed${COLOR_RESET}"
+    echo "${COLOR_YELLOW}We should ignore such case. Checking if junitxml file ${RESULT_LOG_FILE} is there with 0 errors and failures${COLOR_RESET}"
+    if [[ -f ${RESULT_LOG_FILE} ]]; then
+        python "${AIRFLOW_SOURCES}/scripts/in_container/check_junitxml_result.py" "${RESULT_LOG_FILE}"
+        RES=$?
+    else
+        echo "${COLOR_YELLOW}JunitXML file ${RESULT_LOG_FILE} does not exist. Proceeding with failure as we cannot check if there were no failures.${COLOR_RESET}"
+    fi
+fi
+
 set +x
-if [[ "${RES}" == "0" && ${CI:="false"} == "true" ]]; then
+if [[ "${RES}" == "0" && ( ${CI:="false"} == "true" || ${CI} == "True" ) ]]; then
     echo "All tests successful"
     cp .coverage /files
 fi
@@ -50,7 +61,7 @@ if [[ ${TEST_TYPE:=} == "Quarantined" ]]; then
     fi
 fi
 
-if [[ ${CI:=} == "true" ]]; then
+if [[ ${CI:="false"} == "true" || ${CI} == "True" ]]; then
     if [[ ${RES} != "0" ]]; then
         echo
         echo "Dumping logs on error"

@@ -104,7 +104,7 @@ DEFAULT_LOGGING_CONFIG: Dict[str, Any] = {
             'filters': ['mask_secrets'],
         },
         'flask_appbuilder': {
-            'handler': ['console'],
+            'handlers': ['console'],
             'level': FAB_LOG_LEVEL,
             'propagate': True,
         },
@@ -120,7 +120,7 @@ EXTRA_LOGGER_NAMES: str = conf.get('logging', 'EXTRA_LOGGER_NAMES', fallback=Non
 if EXTRA_LOGGER_NAMES:
     new_loggers = {
         logger_name.strip(): {
-            'handler': ['console'],
+            'handlers': ['console'],
             'level': LOG_LEVEL,
             'propagate': True,
         }
@@ -194,12 +194,13 @@ if REMOTE_LOGGING:
 
         DEFAULT_LOGGING_CONFIG['handlers'].update(S3_REMOTE_HANDLERS)
     elif REMOTE_BASE_LOG_FOLDER.startswith('cloudwatch://'):
+        url_parts = urlparse(REMOTE_BASE_LOG_FOLDER)
         CLOUDWATCH_REMOTE_HANDLERS: Dict[str, Dict[str, str]] = {
             'task': {
                 'class': 'airflow.providers.amazon.aws.log.cloudwatch_task_handler.CloudwatchTaskHandler',
                 'formatter': 'airflow',
                 'base_log_folder': str(os.path.expanduser(BASE_LOG_FOLDER)),
-                'log_group_arn': urlparse(REMOTE_BASE_LOG_FOLDER).netloc,
+                'log_group_arn': url_parts.netloc + url_parts.path,
                 'filename_template': FILENAME_TEMPLATE,
             },
         }
@@ -247,6 +248,17 @@ if REMOTE_LOGGING:
         }
 
         DEFAULT_LOGGING_CONFIG['handlers'].update(STACKDRIVER_REMOTE_HANDLERS)
+    elif REMOTE_BASE_LOG_FOLDER.startswith('oss://'):
+        OSS_REMOTE_HANDLERS = {
+            'task': {
+                'class': 'airflow.providers.alibaba.cloud.log.oss_task_handler.OSSTaskHandler',
+                'formatter': 'airflow',
+                'base_log_folder': os.path.expanduser(BASE_LOG_FOLDER),
+                'oss_log_folder': REMOTE_BASE_LOG_FOLDER,
+                'filename_template': FILENAME_TEMPLATE,
+            },
+        }
+        DEFAULT_LOGGING_CONFIG['handlers'].update(OSS_REMOTE_HANDLERS)
     elif ELASTICSEARCH_HOST:
         ELASTICSEARCH_LOG_ID_TEMPLATE: str = conf.get('elasticsearch', 'LOG_ID_TEMPLATE')
         ELASTICSEARCH_END_OF_LOG_MARK: str = conf.get('elasticsearch', 'END_OF_LOG_MARK')
@@ -254,6 +266,8 @@ if REMOTE_LOGGING:
         ELASTICSEARCH_WRITE_STDOUT: bool = conf.getboolean('elasticsearch', 'WRITE_STDOUT')
         ELASTICSEARCH_JSON_FORMAT: bool = conf.getboolean('elasticsearch', 'JSON_FORMAT')
         ELASTICSEARCH_JSON_FIELDS: str = conf.get('elasticsearch', 'JSON_FIELDS')
+        ELASTICSEARCH_HOST_FIELD: str = conf.get('elasticsearch', 'HOST_FIELD')
+        ELASTICSEARCH_OFFSET_FIELD: str = conf.get('elasticsearch', 'OFFSET_FIELD')
 
         ELASTIC_REMOTE_HANDLERS: Dict[str, Dict[str, Union[str, bool]]] = {
             'task': {
@@ -268,6 +282,8 @@ if REMOTE_LOGGING:
                 'write_stdout': ELASTICSEARCH_WRITE_STDOUT,
                 'json_format': ELASTICSEARCH_JSON_FORMAT,
                 'json_fields': ELASTICSEARCH_JSON_FIELDS,
+                'host_field': ELASTICSEARCH_HOST_FIELD,
+                'offset_field': ELASTICSEARCH_OFFSET_FIELD,
             },
         }
 

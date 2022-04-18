@@ -22,9 +22,17 @@ description: |
     `Dingding <https://oapi.dingtalk.com/>`__
 
 versions:
+  - 2.0.4
+  - 2.0.3
+  - 2.0.2
+  - 2.0.1
+  - 2.0.0
   - 1.0.2
   - 1.0.1
   - 1.0.0
+
+additional-dependencies:
+  - apache-airflow>=2.1.0
 
 integrations:
   - integration-name: Dingding
@@ -43,3 +51,10 @@ hooks:
   - integration-name: IBM Cloudant
     python-modules:
       - airflow.providers.dingding.hooks.dingding
+
+hook-class-names:  # deprecated - to be removed after providers add dependency on Airflow 2.2.0+
+  - airflow.providers.dingding.hooks.dingding.DingdingHook
+
+connection-types:
+  - hook-class-name: airflow.providers.dingding.hooks.dingding.DingdingHook
+    connection-type: dingding

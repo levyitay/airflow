@@ -25,6 +25,8 @@ const CopyWebpackPlugin = require('copy-webpack-plugin');
 const MiniCssExtractPlugin = require('mini-css-extract-plugin');
 const MomentLocalesPlugin = require('moment-locales-webpack-plugin');
 const OptimizeCSSAssetsPlugin = require('optimize-css-assets-webpack-plugin');
+const LicensePlugin = require('webpack-license-plugin');
+const TerserPlugin = require('terser-webpack-plugin');
 
 // Input Directory (airflow/www)
 // noinspection JSUnresolvedVariable
@@ -35,11 +37,29 @@ const JS_DIR = path.resolve(__dirname, './static/js');
 // noinspection JSUnresolvedVariable
 const BUILD_DIR = path.resolve(__dirname, './static/dist');
 
+// Convert licenses json into a standard format for LICENSES.txt
+const formatLicenses = (packages) => {
+  let text = `Apache Airflow
+Copyright 2016-2021 The Apache Software Foundation
+
+This product includes software developed at The Apache Software
+Foundation (http://www.apache.org/).
+
+=======================================================================
+`;
+  packages.forEach((p) => {
+    text += `${p.name}|${p.version}:\n-----\n${p.license}\n${p.licenseText || p.author}\n${p.repository || ''}\n\n\n`;
+  });
+  return text;
+};
+
 const config = {
   entry: {
     airflowDefaultTheme: `${CSS_DIR}/bootstrap-theme.css`,
     connectionForm: `${JS_DIR}/connection_form.js`,
+    dag: `${JS_DIR}/dag.js`,
     dagCode: `${JS_DIR}/dag_code.js`,
+    dagDependencies: `${JS_DIR}/dag_dependencies.js`,
     dags: [`${CSS_DIR}/dags.css`, `${JS_DIR}/dags.js`],
     flash: `${CSS_DIR}/flash.css`,
     gantt: [`${CSS_DIR}/gantt.css`, `${JS_DIR}/gantt.js`],
@@ -50,11 +70,11 @@ const config = {
     materialIcons: `${CSS_DIR}/material-icons.css`,
     moment: 'moment-timezone',
     switch: `${CSS_DIR}/switch.css`,
+    task: `${JS_DIR}/task.js`,
     taskInstances: `${JS_DIR}/task_instances.js`,
-    taskInstance: `${JS_DIR}/task_instance.js`,
     tiLog: `${JS_DIR}/ti_log.js`,
-    tree: [`${CSS_DIR}/tree.css`, `${JS_DIR}/tree.js`],
-    circles: `${JS_DIR}/circles.js`,
+    tree: [`${CSS_DIR}/tree.css`, `${JS_DIR}/tree/index.jsx`],
+    calendar: [`${CSS_DIR}/calendar.css`, `${JS_DIR}/calendar.js`],
     durationChart: `${JS_DIR}/duration_chart.js`,
     trigger: `${JS_DIR}/trigger.js`,
     variableEdit: `${JS_DIR}/variable_edit.js`,
@@ -83,6 +103,9 @@ const config = {
         test: /\.jsx?$/,
         exclude: /node_modules/,
         loader: 'babel-loader',
+        options: {
+          presets: ['@babel/preset-react'],
+        },
       },
       // Extract css files
       {
@@ -216,9 +239,21 @@ const config = {
         },
       ],
     }),
+    new LicensePlugin({
+      additionalFiles: {
+        '../../../../licenses/LICENSES-ui.txt': formatLicenses,
+      },
+      unacceptableLicenseTest: (licenseIdentifier) => (
+        ['BCL', 'JSR', 'ASL', 'RSAL', 'SSPL', 'CPOL', 'NPL', 'BSD-4', 'QPL', 'GPL', 'LGPL'].includes(licenseIdentifier)
+      ),
+    }),
   ],
   optimization: {
-    minimizer: [new OptimizeCSSAssetsPlugin({})],
+    minimize: process.env.NODE_ENV === 'production',
+    minimizer: [
+      new OptimizeCSSAssetsPlugin({}),
+      new TerserPlugin(),
+    ],
   },
 };
 

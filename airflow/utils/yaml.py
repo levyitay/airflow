@@ -26,11 +26,10 @@ This module delegates all other properties to the yaml module, so it can be used
 
 And then be used directly in place of the normal python module.
 """
-import sys
 from typing import TYPE_CHECKING, Any, BinaryIO, TextIO, Union, cast
 
 if TYPE_CHECKING:
-    from yaml.error import MarkedYAMLError  # noqa
+    from yaml.error import MarkedYAMLError, YAMLError  # noqa
 
 
 def safe_load(stream: Union[bytes, str, BinaryIO, TextIO]) -> Any:
@@ -68,9 +67,3 @@ def __getattr__(name):
         getattr(yaml, "CFullLoader", yaml.FullLoader)
 
     return getattr(yaml, name)
-
-
-if sys.version_info < (3, 7):
-    from pep562 import Pep562
-
-    Pep562(__name__)

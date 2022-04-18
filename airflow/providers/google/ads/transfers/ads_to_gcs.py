@@ -18,12 +18,14 @@
 import csv
 from operator import attrgetter
 from tempfile import NamedTemporaryFile
-from typing import List, Optional, Sequence, Union
+from typing import TYPE_CHECKING, List, Optional, Sequence, Union
 
 from airflow.models import BaseOperator
 from airflow.providers.google.ads.hooks.ads import GoogleAdsHook
 from airflow.providers.google.cloud.hooks.gcs import GCSHook
-from airflow.utils.decorators import apply_defaults
+
+if TYPE_CHECKING:
+    from airflow.utils.context import Context
 
 
 class GoogleAdsToGcsOperator(BaseOperator):
@@ -41,23 +43,14 @@ class GoogleAdsToGcsOperator(BaseOperator):
         :ref:`howto/operator:GoogleAdsToGcsOperator`
 
     :param client_ids: Google Ads client IDs to query
-    :type client_ids: List[str]
     :param query: Google Ads Query Language API query
-    :type query: str
     :param attributes: List of Google Ads Row attributes to extract
-    :type attributes: List[str]
     :param bucket: The GCS bucket to upload to
-    :type bucket: str
     :param obj: GCS path to save the object. Must be the full file path (ex. `path/to/file.txt`)
-    :type obj: str
     :param gcp_conn_id: Airflow Google Cloud connection ID
-    :type gcp_conn_id: str
     :param google_ads_conn_id: Airflow Google Ads connection ID
-    :type google_ads_conn_id: str
     :param page_size: The number of results per API page request. Max 10,000
-    :type page_size: int
     :param gzip: Option to compress local file or file data for upload
-    :type gzip: bool
     :param impersonation_chain: Optional service account to impersonate using short-term
         credentials, or chained list of accounts required to get the access_token
         of the last account in the list, which will be impersonated in the request.
@@ -66,10 +59,10 @@ class GoogleAdsToGcsOperator(BaseOperator):
         If set as a sequence, the identities from the list must grant
         Service Account Token Creator IAM role to the directly preceding identity, with first
         account from the list granting this role to the originating account (templated).
-    :type impersonation_chain: Union[str, Sequence[str]]
+    :param api_version: Optional Google Ads API version to use.
     """
 
-    template_fields = (
+    template_fields: Sequence[str] = (
         "client_ids",
         "query",
         "attributes",
@@ -78,7 +71,6 @@ class GoogleAdsToGcsOperator(BaseOperator):
         "impersonation_chain",
     )
 
-    @apply_defaults
     def __init__(
         self,
         *,
@@ -92,6 +84,7 @@ class GoogleAdsToGcsOperator(BaseOperator):
         page_size: int = 10000,
         gzip: bool = False,
         impersonation_chain: Optional[Union[str, Sequence[str]]] = None,
+        api_version: Optional[str] = None,
         **kwargs,
     ) -> None:
         super().__init__(**kwargs)
@@ -105,9 +98,14 @@ class GoogleAdsToGcsOperator(BaseOperator):
         self.page_size = page_size
         self.gzip = gzip
         self.impersonation_chain = impersonation_chain
+        self.api_version = api_version
 
-    def execute(self, context: dict) -> None:
-        service = GoogleAdsHook(gcp_conn_id=self.gcp_conn_id, google_ads_conn_id=self.google_ads_conn_id)
+    def execute(self, context: 'Context') -> None:
+        service = GoogleAdsHook(
+            gcp_conn_id=self.gcp_conn_id,
+            google_ads_conn_id=self.google_ads_conn_id,
+            api_version=self.api_version,
+        )
         rows = service.search(client_ids=self.client_ids, query=self.query, page_size=self.page_size)
 
         try:

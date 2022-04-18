@@ -25,7 +25,7 @@ import pytest
 
 from airflow.exceptions import AirflowException
 from airflow.models import Connection
-from airflow.providers.microsoft.azure.hooks.azure_fileshare import AzureFileShareHook
+from airflow.providers.microsoft.azure.hooks.fileshare import AzureFileShareHook
 from airflow.utils.process_utils import patch_environ
 from tests.test_utils import AIRFLOW_MAIN_FOLDER
 from tests.test_utils.system_tests_class import SystemTest
@@ -45,7 +45,6 @@ def provide_wasb_default_connection(key_file_path: str):
     Context manager to provide a temporary value for wasb_default connection
 
     :param key_file_path: Path to file with wasb_default credentials .json file.
-    :type key_file_path: str
     """
     if not key_file_path.endswith(".json"):
         raise AirflowException("Use a JSON key file.")
@@ -68,7 +67,6 @@ def provide_azure_data_lake_default_connection(key_file_path: str):
     """
     Context manager to provide a temporary value for azure_data_lake_default connection
     :param key_file_path: Path to file with azure_data_lake_default credentials .json file.
-    :type key_file_path: str
     """
     required_fields = {'login', 'password', 'extra'}
 
@@ -93,32 +91,32 @@ def provide_azure_data_lake_default_connection(key_file_path: str):
 
 
 @contextmanager
-def provide_azure_fileshare(share_name: str, wasb_conn_id: str, file_name: str, directory: str):
+def provide_azure_fileshare(share_name: str, azure_fileshare_conn_id: str, file_name: str, directory: str):
     AzureSystemTest.prepare_share(
         share_name=share_name,
-        wasb_conn_id=wasb_conn_id,
+        azure_fileshare_conn_id=azure_fileshare_conn_id,
         file_name=file_name,
         directory=directory,
     )
     yield
-    AzureSystemTest.delete_share(share_name=share_name, wasb_conn_id=wasb_conn_id)
+    AzureSystemTest.delete_share(share_name=share_name, azure_fileshare_conn_id=azure_fileshare_conn_id)
 
 
 @pytest.mark.system("azure")
 class AzureSystemTest(SystemTest):
     @classmethod
-    def create_share(cls, share_name: str, wasb_conn_id: str):
-        hook = AzureFileShareHook(wasb_conn_id=wasb_conn_id)
+    def create_share(cls, share_name: str, azure_fileshare_conn_id: str):
+        hook = AzureFileShareHook(azure_fileshare_conn_id=azure_fileshare_conn_id)
         hook.create_share(share_name)
 
     @classmethod
-    def delete_share(cls, share_name: str, wasb_conn_id: str):
-        hook = AzureFileShareHook(wasb_conn_id=wasb_conn_id)
+    def delete_share(cls, share_name: str, azure_fileshare_conn_id: str):
+        hook = AzureFileShareHook(azure_fileshare_conn_id=azure_fileshare_conn_id)
         hook.delete_share(share_name)
 
     @classmethod
-    def create_directory(cls, share_name: str, wasb_conn_id: str, directory: str):
-        hook = AzureFileShareHook(wasb_conn_id=wasb_conn_id)
+    def create_directory(cls, share_name: str, azure_fileshare_conn_id: str, directory: str):
+        hook = AzureFileShareHook(azure_fileshare_conn_id=azure_fileshare_conn_id)
         hook.create_directory(share_name=share_name, directory_name=directory)
 
     @classmethod
@@ -126,11 +124,11 @@ class AzureSystemTest(SystemTest):
         cls,
         string_data: str,
         share_name: str,
-        wasb_conn_id: str,
+        azure_fileshare_conn_id: str,
         file_name: str,
         directory: str,
     ):
-        hook = AzureFileShareHook(wasb_conn_id=wasb_conn_id)
+        hook = AzureFileShareHook(azure_fileshare_conn_id=azure_fileshare_conn_id)
         hook.load_string(
             string_data=string_data,
             share_name=share_name,
@@ -139,17 +137,19 @@ class AzureSystemTest(SystemTest):
         )
 
     @classmethod
-    def prepare_share(cls, share_name: str, wasb_conn_id: str, file_name: str, directory: str):
+    def prepare_share(cls, share_name: str, azure_fileshare_conn_id: str, file_name: str, directory: str):
         """
         Create share with a file in given directory. If directory is None, file is in root dir.
         """
-        cls.create_share(share_name=share_name, wasb_conn_id=wasb_conn_id)
-        cls.create_directory(share_name=share_name, wasb_conn_id=wasb_conn_id, directory=directory)
+        cls.create_share(share_name=share_name, azure_fileshare_conn_id=azure_fileshare_conn_id)
+        cls.create_directory(
+            share_name=share_name, azure_fileshare_conn_id=azure_fileshare_conn_id, directory=directory
+        )
         string_data = "".join(random.choice(string.ascii_letters) for _ in range(1024))
         cls.upload_file_from_string(
             string_data=string_data,
             share_name=share_name,
-            wasb_conn_id=wasb_conn_id,
+            azure_fileshare_conn_id=azure_fileshare_conn_id,
             file_name=file_name,
             directory=directory,
         )

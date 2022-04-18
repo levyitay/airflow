@@ -35,11 +35,8 @@ class PoolSlotsAvailableDep(BaseTIDep):
         Determines if the pool task instance is in has available slots
 
         :param ti: the task instance to get the dependency status for
-        :type ti: airflow.models.TaskInstance
         :param session: database session
-        :type session: sqlalchemy.orm.session.Session
         :param dep_context: the context for which this dependency should be evaluated for
-        :type dep_context: DepContext
         :return: True if there are available slots in the pool.
         """
         from airflow.models.pool import Pool  # To avoid a circular dependency
@@ -49,27 +46,23 @@ class PoolSlotsAvailableDep(BaseTIDep):
         pools = session.query(Pool).filter(Pool.pool == pool_name).all()
         if not pools:
             yield self._failing_status(
-                reason=("Tasks using non-existent pool '%s' will not be scheduled", pool_name)
+                reason=f"Tasks using non-existent pool '{pool_name}' will not be scheduled"
             )
             return
         else:
             # Controlled by UNIQUE key in slot_pool table,
             # only one result can be returned.
-            open_slots = pools[0].open_slots()
+            open_slots = pools[0].open_slots(session=session)
 
         if ti.state in EXECUTION_STATES:
             open_slots += ti.pool_slots
 
         if open_slots <= (ti.pool_slots - 1):
             yield self._failing_status(
-                reason=(
-                    "Not scheduling since there are %s open slots in pool %s and require %s pool slots",
-                    open_slots,
-                    pool_name,
-                    ti.pool_slots,
-                )
+                reason=f"Not scheduling since there are {open_slots} open slots in pool {pool_name} "
+                f"and require {ti.pool_slots} pool slots"
             )
         else:
             yield self._passing_status(
-                reason=("There are enough open slots in %s to execute the task", pool_name)
+                reason=f"There are enough open slots in {pool_name} to execute the task",
             )

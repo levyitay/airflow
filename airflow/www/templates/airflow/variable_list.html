@@ -20,6 +20,7 @@
 {% extends 'appbuilder/general/model/list.html' %}
 
 {% block content %}
+  {% if can_create_variable() %}
   <div class="well well-sm pull-left">
     <form class="form-inline" action="{{ url_for('VariableModelView.varimport') }}" method="post" enctype="multipart/form-data">
       {% if csrf_token %}
@@ -35,5 +36,10 @@
     </form>
   </div>
   <div class="clearfix"></div>
+  {% endif %}
   {{ super() }}
+  <style>
+    td { white-space: nowrap; text-overflow: ellipsis; overflow: hidden; max-width:1px;}
+    th { resize: horizontal; overflow: auto;}
+  </style>
 {% endblock %}

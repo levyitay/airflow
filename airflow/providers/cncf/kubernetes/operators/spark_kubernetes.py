@@ -15,11 +15,13 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
-from typing import Optional
+from typing import TYPE_CHECKING, Optional, Sequence
 
 from airflow.models import BaseOperator
 from airflow.providers.cncf.kubernetes.hooks.kubernetes import KubernetesHook
-from airflow.utils.decorators import apply_defaults
+
+if TYPE_CHECKING:
+    from airflow.utils.context import Context
 
 
 class SparkKubernetesOperator(BaseOperator):
@@ -30,24 +32,19 @@ class SparkKubernetesOperator(BaseOperator):
         For more detail about Spark Application Object have a look at the reference:
         https://github.com/GoogleCloudPlatform/spark-on-k8s-operator/blob/v1beta2-1.1.0-2.4.5/docs/api-docs.md#sparkapplication
 
-    :param application_file: filepath to kubernetes custom_resource_definition of sparkApplication
-    :type application_file:  str
+    :param application_file: Defines Kubernetes 'custom_resource_definition' of 'sparkApplication' as either a
+        path to a '.yaml' file, '.json' file, YAML string or JSON string.
     :param namespace: kubernetes namespace to put sparkApplication
-    :type namespace: str
     :param kubernetes_conn_id: The :ref:`kubernetes connection id <howto/connection:kubernetes>`
         for the to Kubernetes cluster.
-    :type kubernetes_conn_id: str
     :param api_group: kubernetes api group of sparkApplication
-    :type api_group: str
     :param api_version: kubernetes api version of sparkApplication
-    :type api_version: str
     """
 
-    template_fields = ['application_file', 'namespace']
-    template_ext = ('yaml', 'yml', 'json')
+    template_fields: Sequence[str] = ('application_file', 'namespace')
+    template_ext: Sequence[str] = ('.yaml', '.yml', '.json')
     ui_color = '#f4a460'
 
-    @apply_defaults
     def __init__(
         self,
         *,
@@ -64,14 +61,15 @@ class SparkKubernetesOperator(BaseOperator):
         self.kubernetes_conn_id = kubernetes_conn_id
         self.api_group = api_group
         self.api_version = api_version
+        self.plural = "sparkapplications"
 
-    def execute(self, context):
-        self.log.info("Creating sparkApplication")
+    def execute(self, context: 'Context'):
         hook = KubernetesHook(conn_id=self.kubernetes_conn_id)
+        self.log.info("Creating sparkApplication")
         response = hook.create_custom_object(
             group=self.api_group,
             version=self.api_version,
-            plural="sparkapplications",
+            plural=self.plural,
             body=self.application_file,
             namespace=self.namespace,
         )

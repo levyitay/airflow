@@ -15,12 +15,12 @@
 # specific language governing permissions and limitations
 # under the License.
 ---
-version: "2.2"
+version: "3.7"
 services:
   airflow:
     environment:
       - BACKEND=sqlite
-      - AIRFLOW__CORE__SQL_ALCHEMY_CONN=${SQLITE_URL}
+      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=${SQLITE_URL}
       - AIRFLOW__CORE__EXECUTOR=SequentialExecutor
     volumes:
       - /dev/urandom:/dev/random   # Required to get non-blocking entropy source

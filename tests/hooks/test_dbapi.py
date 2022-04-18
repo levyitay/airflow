@@ -30,7 +30,7 @@ class TestDbApiHook(unittest.TestCase):
     def setUp(self):
         super().setUp()
 
-        self.cur = mock.MagicMock()
+        self.cur = mock.MagicMock(rowcount=0)
         self.conn = mock.MagicMock()
         self.conn.cursor.return_value = self.cur
         conn = self.conn
@@ -43,6 +43,7 @@ class TestDbApiHook(unittest.TestCase):
                 return conn
 
         self.db_hook = UnitTestDbApiHook()
+        self.db_hook_schema_override = UnitTestDbApiHook(schema='schema-override')
 
     def test_get_records(self):
         statement = "SQL"
@@ -149,7 +150,7 @@ class TestDbApiHook(unittest.TestCase):
     def test_get_uri_schema_not_none(self):
         self.db_hook.get_connection = mock.MagicMock(
             return_value=Connection(
-                conn_type="conn_type",
+                conn_type="conn-type",
                 host="host",
                 login="login",
                 password="password",
@@ -157,30 +158,118 @@ class TestDbApiHook(unittest.TestCase):
                 port=1,
             )
         )
-        assert "conn_type://login:password@host:1/schema" == self.db_hook.get_uri()
+        assert "conn-type://login:password@host:1/schema" == self.db_hook.get_uri()
 
-    def test_get_uri_schema_none(self):
-        self.db_hook.get_connection = mock.MagicMock(
+    def test_get_uri_schema_override(self):
+        self.db_hook_schema_override.get_connection = mock.MagicMock(
             return_value=Connection(
-                conn_type="conn_type", host="host", login="login", password="password", schema=None, port=1
-            )
-        )
-        assert "conn_type://login:password@host:1/" == self.db_hook.get_uri()
-
-    def test_get_uri_special_characters(self):
-        self.db_hook.get_connection = mock.MagicMock(
-            return_value=Connection(
-                conn_type="conn_type",
+                conn_type="conn-type",
                 host="host",
-                login="logi#! n",
-                password="pass*! word",
+                login="login",
+                password="password",
                 schema="schema",
                 port=1,
             )
         )
-        assert "conn_type://logi%23%21+n:pass%2A%21+word@host:1/schema" == self.db_hook.get_uri()
+        assert "conn-type://login:password@host:1/schema-override" == self.db_hook_schema_override.get_uri()
+
+    def test_get_uri_schema_none(self):
+        self.db_hook.get_connection = mock.MagicMock(
+            return_value=Connection(
+                conn_type="conn-type", host="host", login="login", password="password", schema=None, port=1
+            )
+        )
+        assert "conn-type://login:password@host:1" == self.db_hook.get_uri()
+
+    def test_get_uri_special_characters(self):
+        self.db_hook.get_connection = mock.MagicMock(
+            return_value=Connection(
+                conn_type="conn-type",
+                host="host/",
+                login="lo/gi#! n",
+                password="pass*! word/",
+                schema="schema/",
+                port=1,
+            )
+        )
+        assert (
+            "conn-type://lo%2Fgi%23%21%20n:pass%2A%21%20word%2F@host%2F:1/schema%2F" == self.db_hook.get_uri()
+        )
+
+    def test_get_uri_login_none(self):
+        self.db_hook.get_connection = mock.MagicMock(
+            return_value=Connection(
+                conn_type="conn-type",
+                host="host",
+                login=None,
+                password="password",
+                schema="schema",
+                port=1,
+            )
+        )
+        assert "conn-type://:password@host:1/schema" == self.db_hook.get_uri()
+
+    def test_get_uri_password_none(self):
+        self.db_hook.get_connection = mock.MagicMock(
+            return_value=Connection(
+                conn_type="conn-type",
+                host="host",
+                login="login",
+                password=None,
+                schema="schema",
+                port=1,
+            )
+        )
+        assert "conn-type://login@host:1/schema" == self.db_hook.get_uri()
+
+    def test_get_uri_authority_none(self):
+        self.db_hook.get_connection = mock.MagicMock(
+            return_value=Connection(
+                conn_type="conn-type",
+                host="host",
+                login=None,
+                password=None,
+                schema="schema",
+                port=1,
+            )
+        )
+        assert "conn-type://host:1/schema" == self.db_hook.get_uri()
 
     def test_run_log(self):
         statement = 'SQL'
         self.db_hook.run(statement)
         assert self.db_hook.log.info.call_count == 2
+
+    def test_run_with_handler(self):
+        sql = 'SQL'
+        param = ('p1', 'p2')
+        called = 0
+        obj = object()
+
+        def handler(cur):
+            cur.execute.assert_called_once_with(sql, param)
+            nonlocal called
+            called += 1
+            return obj
+
+        result = self.db_hook.run(sql, parameters=param, handler=handler)
+        assert called == 1
+        assert self.conn.commit.called
+        assert result == obj
+
+    def test_run_with_handler_multiple(self):
+        sql = ['SQL', 'SQL']
+        param = ('p1', 'p2')
+        called = 0
+        obj = object()
+
+        def handler(cur):
+            cur.execute.assert_called_with(sql[0], param)
+            nonlocal called
+            called += 1
+            return obj
+
+        result = self.db_hook.run(sql, parameters=param, handler=handler)
+        assert called == 2
+        assert self.conn.commit.called
+        assert result == [obj, obj]

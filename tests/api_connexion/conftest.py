@@ -25,11 +25,16 @@ from tests.test_utils.decorators import dont_initialize_flask_app_submodules
 @pytest.fixture(scope="session")
 def minimal_app_for_api():
     @dont_initialize_flask_app_submodules(
-        skip_all_except=["init_appbuilder", "init_api_experimental_auth", "init_api_connexion"]
+        skip_all_except=[
+            "init_appbuilder",
+            "init_api_experimental_auth",
+            "init_api_connexion",
+            "init_airflow_session_interface",
+        ]
     )
     def factory():
-        with conf_vars({("api", "auth_backend"): "tests.test_utils.remote_user_api_auth_backend"}):
-            return app.create_app(testing=True)  # type:ignore
+        with conf_vars({("api", "auth_backends"): "tests.test_utils.remote_user_api_auth_backend"}):
+            return app.create_app(testing=True, config={'WTF_CSRF_ENABLED': False})  # type:ignore
 
     return factory()
 
@@ -40,3 +45,11 @@ def session():
 
     with create_session() as session:
         yield session
+
+
+@pytest.fixture(scope="session")
+def dagbag():
+    from airflow.models import DagBag
+
+    DagBag(include_examples=True, read_dags_from_db=False).sync_to_db()
+    return DagBag(include_examples=True, read_dags_from_db=True)

@@ -27,15 +27,15 @@ workflow. Airflow is essentially a graph (Directed Acyclic Graph) made up of tas
 A task defined or implemented by a operator is a unit of work in your data pipeline.
 
 The purpose of Postgres Operator is to define tasks involving interactions with the PostgreSQL database.
- In ``Airflow-2.0``, the ``PostgresOperator`` class resides at ``airflow.providers.postgres.operator.postgres``.
+ In ``Airflow-2.0``, the ``PostgresOperator`` class resides at ``airflow.providers.postgres.operators.postgres``.
 
-Under the hood, the :class:`~airflow.providers.postgres.operator.postgres.PostgresOperator` delegates its heavy lifting to the :class:`~airflow.providers.postgres.hooks.postgres.PostgresHook`.
+Under the hood, the :class:`~airflow.providers.postgres.operators.postgres.PostgresOperator` delegates its heavy lifting to the :class:`~airflow.providers.postgres.hooks.postgres.PostgresHook`.
 
 Common Database Operations with PostgresOperator
 ------------------------------------------------
 
-To use the postgres operator to carry out SQL request, two parameters are required: ``sql`` and ``postgres_conn_id``.
-These two parameters are eventually fed to the postgres hook object that interacts directly with the postgres database.
+To use the PostgresOperator to carry out SQL request, two parameters are required: ``sql`` and ``postgres_conn_id``.
+These two parameters are eventually fed to the PostgresHook object that interacts directly with the Postgres database.
 
 Creating a Postgres database table
 ----------------------------------
@@ -70,10 +70,10 @@ Now let's refactor ``create_pet_table`` in our DAG:
 .. code-block:: python
 
         create_pet_table = PostgresOperator(
-              task_id="create_pet_table",
-              postgres_conn_id="postgres_default",
-              sql="sql/pet_schema.sql"
-              )
+            task_id="create_pet_table",
+            postgres_conn_id="postgres_default",
+            sql="sql/pet_schema.sql",
+        )
 
 
 Inserting data into a Postgres database table
@@ -94,24 +94,24 @@ We can then create a PostgresOperator task that populate the ``pet`` table.
 .. code-block:: python
 
   populate_pet_table = PostgresOperator(
-            task_id="populate_pet_table",
-            postgres_conn_id="postgres_default",
-            sql="sql/pet_schema.sql"
-            )
+      task_id="populate_pet_table",
+      postgres_conn_id="postgres_default",
+      sql="sql/pet_schema.sql",
+  )
 
 
-Fetching records from your postgres database table
+Fetching records from your Postgres database table
 --------------------------------------------------
 
-Fetching records from your postgres database table can be as simple as:
+Fetching records from your Postgres database table can be as simple as:
 
 .. code-block:: python
 
   get_all_pets = PostgresOperator(
-            task_id="get_all_pets",
-            postgres_conn_id="postgres_default",
-            sql="SELECT * FROM pet;"
-            )
+      task_id="get_all_pets",
+      postgres_conn_id="postgres_default",
+      sql="SELECT * FROM pet;",
+  )
 
 
 
@@ -128,14 +128,11 @@ To find the owner of the pet called 'Lester':
 .. code-block:: python
 
   get_birth_date = PostgresOperator(
-            task_id="get_birth_date",
-            postgres_conn_id="postgres_default",
-            sql="SELECT * FROM pet WHERE birth_date BETWEEN SYMMETRIC %(begin_date)s AND %(end_date)s",
-            parameters={
-                'begin_date': '2020-01-01',
-                'end_date': '2020-12-31'
-                }
-            )
+      task_id="get_birth_date",
+      postgres_conn_id="postgres_default",
+      sql="SELECT * FROM pet WHERE birth_date BETWEEN SYMMETRIC %(begin_date)s AND %(end_date)s",
+      parameters={"begin_date": "2020-01-01", "end_date": "2020-12-31"},
+  )
 
 Now lets refactor our ``get_birth_date`` task. Instead of dumping SQL statements directly into our code, let's tidy things up
 by creating a sql file.
@@ -151,14 +148,23 @@ class.
 .. code-block:: python
 
   get_birth_date = PostgresOperator(
-          task_id="get_birth_date",
-          postgres_conn_id="postgres_default",
-          sql="sql/birth_date.sql",
-          params={
-             'begin_date': '2020-01-01',
-              'end_date': '2020-12-31'
-            }
-          )
+      task_id="get_birth_date",
+      postgres_conn_id="postgres_default",
+      sql="sql/birth_date.sql",
+      params={"begin_date": "2020-01-01", "end_date": "2020-12-31"},
+  )
+
+Passing Server Configuration Parameters into PostgresOperator
+-------------------------------------------------------------
+
+PostgresOperator provides the optional ``runtime_parameters`` attribute which makes it possible to set
+the `server configuration parameter values <https://www.postgresql.org/docs/current/runtime-config-client.html>`_ for the SQL request during runtime.
+
+.. exampleinclude:: /../../airflow/providers/postgres/example_dags/example_postgres.py
+    :language: python
+    :start-after: [START postgres_operator_howto_guide_get_birth_date]
+    :end-before: [END postgres_operator_howto_guide_get_birth_date]
+
 
 The complete Postgres Operator DAG
 ----------------------------------
@@ -177,5 +183,6 @@ Conclusion
 In this how-to guide we explored the Apache Airflow PostgreOperator. Let's quickly highlight the key takeaways.
 In Airflow-2.0, PostgresOperator class now resides in the ``providers`` package. It is best practice to create subdirectory
 called ``sql`` in your ``dags`` directory where you can store your sql files. This will make your code more elegant and more
-maintainable. And finally, we looked at the different ways you can dynamically pass parameters into our postgres operator
-tasks  using ``parameters`` or ``params`` attribute.
+maintainable. And finally, we looked at the different ways you can dynamically pass parameters into our PostgresOperator
+tasks using ``parameters`` or ``params`` attribute and how you can control the server configuration parameters by passing
+the ``runtime_parameters`` attribute.

@@ -26,8 +26,9 @@ in their PYTHONPATH. airflow_login should be based off the
 isort:skip_file
 """
 
+
 # flake8: noqa: F401
-# pylint: disable=wrong-import-position
+
 import sys
 from typing import Callable, Optional
 
@@ -36,7 +37,7 @@ from airflow import version
 
 __version__ = version.version
 
-__all__ = ['__version__', 'login', 'DAG']
+__all__ = ['__version__', 'login', 'DAG', 'PY36', 'PY37', 'PY38', 'PY39', 'PY310', 'XComArg']
 
 # Make `airflow` an namespace package, supporting installing
 # airflow.providers.* in different locations (i.e. one in site, and one in user
@@ -50,19 +51,34 @@ login: Optional[Callable] = None
 PY36 = sys.version_info >= (3, 6)
 PY37 = sys.version_info >= (3, 7)
 PY38 = sys.version_info >= (3, 8)
+PY39 = sys.version_info >= (3, 9)
+PY310 = sys.version_info >= (3, 10)
+
+# Things to lazy import in form 'name': 'path.to.module'
+__lazy_imports = {
+    'DAG': 'airflow.models.dag',
+    'XComArg': 'airflow.models.xcom_arg',
+    'AirflowException': 'airflow.exceptions',
+}
 
 
 def __getattr__(name):
     # PEP-562: Lazy loaded attributes on python modules
-    if name == "DAG":
-        from airflow.models.dag import DAG  # pylint: disable=redefined-outer-name
+    path = __lazy_imports.get(name)
+    if not path:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
-        return DAG
-    if name == "AirflowException":
-        from airflow.exceptions import AirflowException  # pylint: disable=redefined-outer-name
+    import operator
 
-        return AirflowException
-    raise AttributeError(f"module {__name__} has no attribute {name}")
+    # Strip off the "airflow." prefix because of how `__import__` works (it always returns the top level
+    # module)
+    without_prefix = path.split('.', 1)[-1]
+
+    getter = operator.attrgetter(f'{without_prefix}.{name}')
+    val = getter(__import__(path))
+    # Store for next time
+    globals()[name] = val
+    return val
 
 
 if not settings.LAZY_LOAD_PLUGINS:
@@ -73,20 +89,18 @@ if not settings.LAZY_LOAD_PLUGINS:
 if not settings.LAZY_LOAD_PROVIDERS:
     from airflow import providers_manager
 
-    providers_manager.ProvidersManager().initialize_providers_manager()
+    manager = providers_manager.ProvidersManager()
+    manager.initialize_providers_list()
+    manager.initialize_providers_hooks()
+    manager.initialize_providers_extra_links()
 
 
-# This is never executed, but tricks static analyzers (PyDev, PyCharm,
-# pylint, etc.) into knowing the types of these symbols, and what
+# This is never executed, but tricks static analyzers (PyDev, PyCharm,)
+# into knowing the types of these symbols, and what
 # they contain.
 STATICA_HACK = True
 globals()['kcah_acitats'[::-1].upper()] = False
 if STATICA_HACK:  # pragma: no cover
     from airflow.models.dag import DAG
+    from airflow.models.xcom_arg import XComArg
     from airflow.exceptions import AirflowException
-
-
-if not PY37:
-    from pep562 import Pep562
-
-    Pep562(__name__)

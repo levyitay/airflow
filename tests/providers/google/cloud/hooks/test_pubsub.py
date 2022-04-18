@@ -23,12 +23,14 @@ from uuid import UUID
 
 import pytest
 from google.api_core.exceptions import AlreadyExists, GoogleAPICallError
+from google.api_core.gapic_v1.method import DEFAULT
 from google.cloud.exceptions import NotFound
 from google.cloud.pubsub_v1.types import ReceivedMessage
 from googleapiclient.errors import HttpError
 from parameterized import parameterized
 
 from airflow.providers.google.cloud.hooks.pubsub import PubSubException, PubSubHook
+from airflow.providers.google.common.consts import CLIENT_INFO
 from airflow.version import version
 
 BASE_STRING = 'airflow.providers.google.common.hooks.base_google.{}'
@@ -55,7 +57,7 @@ def mock_init(
     gcp_conn_id,
     delegate_to=None,
     impersonation_chain=None,
-):  # pylint: disable=unused-argument
+):
     pass
 
 
@@ -69,38 +71,28 @@ class TestPubSubHook(unittest.TestCase):
             ReceivedMessage(
                 ack_id=str(i),
                 message={
-                    "data": f'Message {i}'.encode('utf8'),
+                    "data": f'Message {i}'.encode(),
                     "attributes": {"type": "generated message"},
                 },
             )
             for i in range(1, count + 1)
         ]
 
-    @mock.patch(
-        "airflow.providers.google.cloud.hooks.pubsub.PubSubHook.client_info", new_callable=mock.PropertyMock
-    )
     @mock.patch("airflow.providers.google.cloud.hooks.pubsub.PubSubHook._get_credentials")
     @mock.patch("airflow.providers.google.cloud.hooks.pubsub.PublisherClient")
-    def test_publisher_client_creation(self, mock_client, mock_get_creds, mock_client_info):
+    def test_publisher_client_creation(self, mock_client, mock_get_creds):
         assert self.pubsub_hook._client is None
         result = self.pubsub_hook.get_conn()
-        mock_client.assert_called_once_with(
-            credentials=mock_get_creds.return_value, client_info=mock_client_info.return_value
-        )
+        mock_client.assert_called_once_with(credentials=mock_get_creds.return_value, client_info=CLIENT_INFO)
         assert mock_client.return_value == result
         assert self.pubsub_hook._client == result
 
-    @mock.patch(
-        "airflow.providers.google.cloud.hooks.pubsub.PubSubHook.client_info", new_callable=mock.PropertyMock
-    )
     @mock.patch("airflow.providers.google.cloud.hooks.pubsub.PubSubHook._get_credentials")
     @mock.patch("airflow.providers.google.cloud.hooks.pubsub.SubscriberClient")
-    def test_subscriber_client_creation(self, mock_client, mock_get_creds, mock_client_info):
+    def test_subscriber_client_creation(self, mock_client, mock_get_creds):
         assert self.pubsub_hook._client is None
         result = self.pubsub_hook.subscriber_client
-        mock_client.assert_called_once_with(
-            credentials=mock_get_creds.return_value, client_info=mock_client_info.return_value
-        )
+        mock_client.assert_called_once_with(credentials=mock_get_creds.return_value, client_info=CLIENT_INFO)
         assert mock_client.return_value == result
 
     @mock.patch(PUBSUB_STRING.format('PubSubHook.get_conn'))
@@ -109,7 +101,7 @@ class TestPubSubHook(unittest.TestCase):
         self.pubsub_hook.create_topic(project_id=TEST_PROJECT, topic=TEST_TOPIC)
         create_method.assert_called_once_with(
             request=dict(name=EXPANDED_TOPIC, labels=LABELS, message_storage_policy=None, kms_key_name=None),
-            retry=None,
+            retry=DEFAULT,
             timeout=None,
             metadata=(),
         )
@@ -119,7 +111,7 @@ class TestPubSubHook(unittest.TestCase):
         delete_method = mock_service.return_value.delete_topic
         self.pubsub_hook.delete_topic(project_id=TEST_PROJECT, topic=TEST_TOPIC)
         delete_method.assert_called_once_with(
-            request=dict(topic=EXPANDED_TOPIC), retry=None, timeout=None, metadata=()
+            request=dict(topic=EXPANDED_TOPIC), retry=DEFAULT, timeout=None, metadata=()
         )
 
     @mock.patch(PUBSUB_STRING.format('PubSubHook.get_conn'))
@@ -186,7 +178,7 @@ class TestPubSubHook(unittest.TestCase):
                 dead_letter_policy=None,
                 retry_policy=None,
             ),
-            retry=None,
+            retry=DEFAULT,
             timeout=None,
             metadata=(),
         )
@@ -201,9 +193,7 @@ class TestPubSubHook(unittest.TestCase):
             subscription=TEST_SUBSCRIPTION,
             subscription_project_id='a-different-project',
         )
-        expected_subscription = 'projects/{}/subscriptions/{}'.format(
-            'a-different-project', TEST_SUBSCRIPTION
-        )
+        expected_subscription = f'projects/a-different-project/subscriptions/{TEST_SUBSCRIPTION}'
         create_method.assert_called_once_with(
             request=dict(
                 name=expected_subscription,
@@ -219,7 +209,7 @@ class TestPubSubHook(unittest.TestCase):
                 dead_letter_policy=None,
                 retry_policy=None,
             ),
-            retry=None,
+            retry=DEFAULT,
             timeout=None,
             metadata=(),
         )
@@ -231,7 +221,7 @@ class TestPubSubHook(unittest.TestCase):
         self.pubsub_hook.delete_subscription(project_id=TEST_PROJECT, subscription=TEST_SUBSCRIPTION)
         delete_method = mock_service.delete_subscription
         delete_method.assert_called_once_with(
-            request=dict(subscription=EXPANDED_SUBSCRIPTION), retry=None, timeout=None, metadata=()
+            request=dict(subscription=EXPANDED_SUBSCRIPTION), retry=DEFAULT, timeout=None, metadata=()
         )
 
     @mock.patch(PUBSUB_STRING.format('PubSubHook.subscriber_client'))
@@ -257,9 +247,7 @@ class TestPubSubHook(unittest.TestCase):
 
     @mock.patch(PUBSUB_STRING.format('PubSubHook.subscriber_client'))
     @mock.patch(PUBSUB_STRING.format('uuid4'), new_callable=mock.Mock(return_value=lambda: TEST_UUID))
-    def test_create_subscription_without_subscription_name(
-        self, mock_uuid, mock_service
-    ):  # noqa  # pylint: disable=unused-argument,line-too-long
+    def test_create_subscription_without_subscription_name(self, mock_uuid, mock_service):
         create_method = mock_service.create_subscription
         expected_name = EXPANDED_SUBSCRIPTION.replace(TEST_SUBSCRIPTION, f'sub-{TEST_UUID}')
 
@@ -279,7 +267,7 @@ class TestPubSubHook(unittest.TestCase):
                 dead_letter_policy=None,
                 retry_policy=None,
             ),
-            retry=None,
+            retry=DEFAULT,
             timeout=None,
             metadata=(),
         )
@@ -307,7 +295,7 @@ class TestPubSubHook(unittest.TestCase):
                 dead_letter_policy=None,
                 retry_policy=None,
             ),
-            retry=None,
+            retry=DEFAULT,
             timeout=None,
             metadata=(),
         )
@@ -338,7 +326,7 @@ class TestPubSubHook(unittest.TestCase):
                 dead_letter_policy=None,
                 retry_policy=None,
             ),
-            retry=None,
+            retry=DEFAULT,
             timeout=None,
             metadata=(),
         )
@@ -384,7 +372,9 @@ class TestPubSubHook(unittest.TestCase):
             mock.call(topic=EXPANDED_TOPIC, data=message.get("data", b''), **message.get('attributes', {}))
             for message in TEST_MESSAGES
         ]
-        publish_method.has_calls(calls)
+        mock_calls_result = publish_method.mock_calls
+        result_refined = [mock_calls_result[0], mock_calls_result[2], mock_calls_result[4]]
+        assert result_refined == calls
 
     @mock.patch(PUBSUB_STRING.format('PubSubHook.get_conn'))
     def test_publish_api_call_error(self, mock_service):
@@ -411,7 +401,7 @@ class TestPubSubHook(unittest.TestCase):
                 max_messages=10,
                 return_immediately=False,
             ),
-            retry=None,
+            retry=DEFAULT,
             timeout=None,
             metadata=(),
         )
@@ -431,7 +421,7 @@ class TestPubSubHook(unittest.TestCase):
                 max_messages=10,
                 return_immediately=False,
             ),
-            retry=None,
+            retry=DEFAULT,
             timeout=None,
             metadata=(),
         )
@@ -459,7 +449,7 @@ class TestPubSubHook(unittest.TestCase):
                     max_messages=10,
                     return_immediately=False,
                 ),
-                retry=None,
+                retry=DEFAULT,
                 timeout=None,
                 metadata=(),
             )
@@ -476,7 +466,7 @@ class TestPubSubHook(unittest.TestCase):
                 subscription=EXPANDED_SUBSCRIPTION,
                 ack_ids=['1', '2', '3'],
             ),
-            retry=None,
+            retry=DEFAULT,
             timeout=None,
             metadata=(),
         )
@@ -495,7 +485,7 @@ class TestPubSubHook(unittest.TestCase):
                 subscription=EXPANDED_SUBSCRIPTION,
                 ack_ids=['1', '2', '3'],
             ),
-            retry=None,
+            retry=DEFAULT,
             timeout=None,
             metadata=(),
         )
@@ -523,7 +513,7 @@ class TestPubSubHook(unittest.TestCase):
                     subscription=EXPANDED_SUBSCRIPTION,
                     ack_ids=['1', '2', '3'],
                 ),
-                retry=None,
+                retry=DEFAULT,
                 timeout=None,
                 metadata=(),
             )

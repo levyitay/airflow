@@ -21,11 +21,6 @@ Downloads data from Google Cloud Storage to Local Filesystem
 The `Google Cloud Storage <https://cloud.google.com/storage/>`__  (GCS) is used to store large data from various applications.
 This page shows how to download data from GCS to local filesystem.
 
-.. contents::
-  :depth: 1
-  :local:
-
-
 Prerequisite Tasks
 ^^^^^^^^^^^^^^^^^^
 
@@ -40,7 +35,7 @@ GCSToLocalFilesystemOperator
 data from GCS to local filesystem.
 
 
-Below is an example of using this operator to upload a file to GCS.
+Below is an example of using this operator to download a file from GCS.
 
 .. exampleinclude:: /../../airflow/providers/google/cloud/example_dags/example_gcs_to_local.py
     :language: python

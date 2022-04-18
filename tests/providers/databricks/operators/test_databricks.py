@@ -46,7 +46,8 @@ NEW_CLUSTER = {'spark_version': '2.0.x-scala2.10', 'node_type_id': 'development-
 EXISTING_CLUSTER_ID = 'existing-cluster-id'
 RUN_NAME = 'run-name'
 RUN_ID = 1
-JOB_ID = 42
+JOB_ID = "42"
+JOB_NAME = "job-name"
 NOTEBOOK_PARAMS = {"dry-run": "true", "oldest-time-to-consider": "1457570074236"}
 JAR_PARAMS = ["param1", "param2"]
 RENDERED_TEMPLATED_JAR_PARAMS = [f'/test-{DATE}']
@@ -126,6 +127,12 @@ class TestDatabricksSubmitRunOperator(unittest.TestCase):
         )
         assert expected == op.json
 
+    def test_init_with_tasks(self):
+        tasks = [{"task_key": 1, "new_cluster": NEW_CLUSTER, "notebook_task": NOTEBOOK_TASK}]
+        op = DatabricksSubmitRunOperator(task_id=TASK_ID, tasks=tasks)
+        expected = databricks_operator._deep_string_coerce({'run_name': TASK_ID, "tasks": tasks})
+        assert expected == op.json
+
     def test_init_with_specified_run_name(self):
         """
         Test the initializer with a specified run_name.
@@ -134,6 +141,18 @@ class TestDatabricksSubmitRunOperator(unittest.TestCase):
         op = DatabricksSubmitRunOperator(task_id=TASK_ID, json=json)
         expected = databricks_operator._deep_string_coerce(
             {'new_cluster': NEW_CLUSTER, 'notebook_task': NOTEBOOK_TASK, 'run_name': RUN_NAME}
+        )
+        assert expected == op.json
+
+    def test_pipeline_task(self):
+        """
+        Test the initializer with a specified run_name.
+        """
+        pipeline_task = {"pipeline_id": "test-dlt"}
+        json = {'new_cluster': NEW_CLUSTER, 'run_name': RUN_NAME, "pipeline_task": pipeline_task}
+        op = DatabricksSubmitRunOperator(task_id=TASK_ID, json=json)
+        expected = databricks_operator._deep_string_coerce(
+            {'new_cluster': NEW_CLUSTER, "pipeline_task": pipeline_task, 'run_name': RUN_NAME}
         )
         assert expected == op.json
 
@@ -205,7 +224,10 @@ class TestDatabricksSubmitRunOperator(unittest.TestCase):
             {'new_cluster': NEW_CLUSTER, 'notebook_task': NOTEBOOK_TASK, 'run_name': TASK_ID}
         )
         db_mock_class.assert_called_once_with(
-            DEFAULT_CONN_ID, retry_limit=op.databricks_retry_limit, retry_delay=op.databricks_retry_delay
+            DEFAULT_CONN_ID,
+            retry_limit=op.databricks_retry_limit,
+            retry_delay=op.databricks_retry_delay,
+            retry_args=None,
         )
 
         db_mock.submit_run.assert_called_once_with(expected)
@@ -238,7 +260,10 @@ class TestDatabricksSubmitRunOperator(unittest.TestCase):
             }
         )
         db_mock_class.assert_called_once_with(
-            DEFAULT_CONN_ID, retry_limit=op.databricks_retry_limit, retry_delay=op.databricks_retry_delay
+            DEFAULT_CONN_ID,
+            retry_limit=op.databricks_retry_limit,
+            retry_delay=op.databricks_retry_delay,
+            retry_args=None,
         )
         db_mock.submit_run.assert_called_once_with(expected)
         db_mock.get_run_page_url.assert_called_once_with(RUN_ID)
@@ -258,6 +283,63 @@ class TestDatabricksSubmitRunOperator(unittest.TestCase):
         op.on_kill()
 
         db_mock.cancel_run.assert_called_once_with(RUN_ID)
+
+    @mock.patch('airflow.providers.databricks.operators.databricks.DatabricksHook')
+    def test_wait_for_termination(self, db_mock_class):
+        run = {
+            'new_cluster': NEW_CLUSTER,
+            'notebook_task': NOTEBOOK_TASK,
+        }
+        op = DatabricksSubmitRunOperator(task_id=TASK_ID, json=run)
+        db_mock = db_mock_class.return_value
+        db_mock.submit_run.return_value = 1
+        db_mock.get_run_state.return_value = RunState('TERMINATED', 'SUCCESS', '')
+
+        assert op.wait_for_termination
+
+        op.execute(None)
+
+        expected = databricks_operator._deep_string_coerce(
+            {'new_cluster': NEW_CLUSTER, 'notebook_task': NOTEBOOK_TASK, 'run_name': TASK_ID}
+        )
+        db_mock_class.assert_called_once_with(
+            DEFAULT_CONN_ID,
+            retry_limit=op.databricks_retry_limit,
+            retry_delay=op.databricks_retry_delay,
+            retry_args=None,
+        )
+
+        db_mock.submit_run.assert_called_once_with(expected)
+        db_mock.get_run_page_url.assert_called_once_with(RUN_ID)
+        db_mock.get_run_state.assert_called_once_with(RUN_ID)
+
+    @mock.patch('airflow.providers.databricks.operators.databricks.DatabricksHook')
+    def test_no_wait_for_termination(self, db_mock_class):
+        run = {
+            'new_cluster': NEW_CLUSTER,
+            'notebook_task': NOTEBOOK_TASK,
+        }
+        op = DatabricksSubmitRunOperator(task_id=TASK_ID, wait_for_termination=False, json=run)
+        db_mock = db_mock_class.return_value
+        db_mock.submit_run.return_value = 1
+
+        assert not op.wait_for_termination
+
+        op.execute(None)
+
+        expected = databricks_operator._deep_string_coerce(
+            {'new_cluster': NEW_CLUSTER, 'notebook_task': NOTEBOOK_TASK, 'run_name': TASK_ID}
+        )
+        db_mock_class.assert_called_once_with(
+            DEFAULT_CONN_ID,
+            retry_limit=op.databricks_retry_limit,
+            retry_delay=op.databricks_retry_delay,
+            retry_args=None,
+        )
+
+        db_mock.submit_run.assert_called_once_with(expected)
+        db_mock.get_run_page_url.assert_called_once_with(RUN_ID)
+        db_mock.get_run_state.assert_not_called()
 
 
 class TestDatabricksRunNowOperator(unittest.TestCase):
@@ -301,7 +383,8 @@ class TestDatabricksRunNowOperator(unittest.TestCase):
         provided. The named parameters should override top level keys in the
         json dict.
         """
-        override_notebook_params = {'workers': 999}
+        override_notebook_params = {'workers': "999"}
+        override_jar_params = ['workers', "998"]
         json = {'notebook_params': NOTEBOOK_PARAMS, 'jar_params': JAR_PARAMS}
 
         op = DatabricksRunNowOperator(
@@ -310,13 +393,14 @@ class TestDatabricksRunNowOperator(unittest.TestCase):
             job_id=JOB_ID,
             notebook_params=override_notebook_params,
             python_params=PYTHON_PARAMS,
+            jar_params=override_jar_params,
             spark_submit_params=SPARK_SUBMIT_PARAMS,
         )
 
         expected = databricks_operator._deep_string_coerce(
             {
                 'notebook_params': override_notebook_params,
-                'jar_params': JAR_PARAMS,
+                'jar_params': override_jar_params,
                 'python_params': PYTHON_PARAMS,
                 'spark_submit_params': SPARK_SUBMIT_PARAMS,
                 'job_id': JOB_ID,
@@ -373,7 +457,10 @@ class TestDatabricksRunNowOperator(unittest.TestCase):
         )
 
         db_mock_class.assert_called_once_with(
-            DEFAULT_CONN_ID, retry_limit=op.databricks_retry_limit, retry_delay=op.databricks_retry_delay
+            DEFAULT_CONN_ID,
+            retry_limit=op.databricks_retry_limit,
+            retry_delay=op.databricks_retry_delay,
+            retry_args=None,
         )
         db_mock.run_now.assert_called_once_with(expected)
         db_mock.get_run_page_url.assert_called_once_with(RUN_ID)
@@ -403,7 +490,10 @@ class TestDatabricksRunNowOperator(unittest.TestCase):
             }
         )
         db_mock_class.assert_called_once_with(
-            DEFAULT_CONN_ID, retry_limit=op.databricks_retry_limit, retry_delay=op.databricks_retry_delay
+            DEFAULT_CONN_ID,
+            retry_limit=op.databricks_retry_limit,
+            retry_delay=op.databricks_retry_delay,
+            retry_args=None,
         )
         db_mock.run_now.assert_called_once_with(expected)
         db_mock.get_run_page_url.assert_called_once_with(RUN_ID)
@@ -419,3 +509,123 @@ class TestDatabricksRunNowOperator(unittest.TestCase):
 
         op.on_kill()
         db_mock.cancel_run.assert_called_once_with(RUN_ID)
+
+    @mock.patch('airflow.providers.databricks.operators.databricks.DatabricksHook')
+    def test_wait_for_termination(self, db_mock_class):
+        run = {'notebook_params': NOTEBOOK_PARAMS, 'notebook_task': NOTEBOOK_TASK, 'jar_params': JAR_PARAMS}
+        op = DatabricksRunNowOperator(task_id=TASK_ID, job_id=JOB_ID, json=run)
+        db_mock = db_mock_class.return_value
+        db_mock.run_now.return_value = 1
+        db_mock.get_run_state.return_value = RunState('TERMINATED', 'SUCCESS', '')
+
+        assert op.wait_for_termination
+
+        op.execute(None)
+
+        expected = databricks_operator._deep_string_coerce(
+            {
+                'notebook_params': NOTEBOOK_PARAMS,
+                'notebook_task': NOTEBOOK_TASK,
+                'jar_params': JAR_PARAMS,
+                'job_id': JOB_ID,
+            }
+        )
+        db_mock_class.assert_called_once_with(
+            DEFAULT_CONN_ID,
+            retry_limit=op.databricks_retry_limit,
+            retry_delay=op.databricks_retry_delay,
+            retry_args=None,
+        )
+
+        db_mock.run_now.assert_called_once_with(expected)
+        db_mock.get_run_page_url.assert_called_once_with(RUN_ID)
+        db_mock.get_run_state.assert_called_once_with(RUN_ID)
+
+    @mock.patch('airflow.providers.databricks.operators.databricks.DatabricksHook')
+    def test_no_wait_for_termination(self, db_mock_class):
+        run = {'notebook_params': NOTEBOOK_PARAMS, 'notebook_task': NOTEBOOK_TASK, 'jar_params': JAR_PARAMS}
+        op = DatabricksRunNowOperator(task_id=TASK_ID, job_id=JOB_ID, wait_for_termination=False, json=run)
+        db_mock = db_mock_class.return_value
+        db_mock.run_now.return_value = 1
+
+        assert not op.wait_for_termination
+
+        op.execute(None)
+
+        expected = databricks_operator._deep_string_coerce(
+            {
+                'notebook_params': NOTEBOOK_PARAMS,
+                'notebook_task': NOTEBOOK_TASK,
+                'jar_params': JAR_PARAMS,
+                'job_id': JOB_ID,
+            }
+        )
+        db_mock_class.assert_called_once_with(
+            DEFAULT_CONN_ID,
+            retry_limit=op.databricks_retry_limit,
+            retry_delay=op.databricks_retry_delay,
+            retry_args=None,
+        )
+
+        db_mock.run_now.assert_called_once_with(expected)
+        db_mock.get_run_page_url.assert_called_once_with(RUN_ID)
+        db_mock.get_run_state.assert_not_called()
+
+    def test_init_exception_with_job_name_and_job_id(self):
+        exception_message = "Argument 'job_name' is not allowed with argument 'job_id'"
+
+        with pytest.raises(AirflowException, match=exception_message):
+            DatabricksRunNowOperator(task_id=TASK_ID, job_id=JOB_ID, job_name=JOB_NAME)
+
+        with pytest.raises(AirflowException, match=exception_message):
+            run = {'job_id': JOB_ID, 'job_name': JOB_NAME}
+            DatabricksRunNowOperator(task_id=TASK_ID, json=run)
+
+        with pytest.raises(AirflowException, match=exception_message):
+            run = {'job_id': JOB_ID}
+            DatabricksRunNowOperator(task_id=TASK_ID, json=run, job_name=JOB_NAME)
+
+    @mock.patch('airflow.providers.databricks.operators.databricks.DatabricksHook')
+    def test_exec_with_job_name(self, db_mock_class):
+        run = {'notebook_params': NOTEBOOK_PARAMS, 'notebook_task': NOTEBOOK_TASK, 'jar_params': JAR_PARAMS}
+        op = DatabricksRunNowOperator(task_id=TASK_ID, job_name=JOB_NAME, json=run)
+        db_mock = db_mock_class.return_value
+        db_mock.find_job_id_by_name.return_value = JOB_ID
+        db_mock.run_now.return_value = 1
+        db_mock.get_run_state.return_value = RunState('TERMINATED', 'SUCCESS', '')
+
+        op.execute(None)
+
+        expected = databricks_operator._deep_string_coerce(
+            {
+                'notebook_params': NOTEBOOK_PARAMS,
+                'notebook_task': NOTEBOOK_TASK,
+                'jar_params': JAR_PARAMS,
+                'job_id': JOB_ID,
+            }
+        )
+
+        db_mock_class.assert_called_once_with(
+            DEFAULT_CONN_ID,
+            retry_limit=op.databricks_retry_limit,
+            retry_delay=op.databricks_retry_delay,
+            retry_args=None,
+        )
+        db_mock.find_job_id_by_name.assert_called_once_with(JOB_NAME)
+        db_mock.run_now.assert_called_once_with(expected)
+        db_mock.get_run_page_url.assert_called_once_with(RUN_ID)
+        db_mock.get_run_state.assert_called_once_with(RUN_ID)
+        assert RUN_ID == op.run_id
+
+    @mock.patch('airflow.providers.databricks.operators.databricks.DatabricksHook')
+    def test_exec_failure_if_job_id_not_found(self, db_mock_class):
+        run = {'notebook_params': NOTEBOOK_PARAMS, 'notebook_task': NOTEBOOK_TASK, 'jar_params': JAR_PARAMS}
+        op = DatabricksRunNowOperator(task_id=TASK_ID, job_name=JOB_NAME, json=run)
+        db_mock = db_mock_class.return_value
+        db_mock.find_job_id_by_name.return_value = None
+
+        exception_message = f"Job ID for job name {JOB_NAME} can not be found"
+        with pytest.raises(AirflowException, match=exception_message):
+            op.execute(None)
+
+        db_mock.find_job_id_by_name.assert_called_once_with(JOB_NAME)

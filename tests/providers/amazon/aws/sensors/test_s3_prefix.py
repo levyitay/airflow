@@ -16,22 +16,53 @@
 # specific language governing permissions and limitations
 # under the License.
 
-import unittest
 from unittest import mock
+from unittest.mock import call
 
-from airflow.providers.amazon.aws.sensors.s3_prefix import S3PrefixSensor
+import pytest
+
+from airflow.providers.amazon.aws.sensors.s3 import S3PrefixSensor
 
 
-class TestS3PrefixSensor(unittest.TestCase):
-    @mock.patch('airflow.providers.amazon.aws.sensors.s3_prefix.S3Hook')
-    def test_poke(self, mock_hook):
-        op = S3PrefixSensor(task_id='s3_prefix', bucket_name='bucket', prefix='prefix')
+def test_deprecation_warnings_generated():
+    with pytest.warns(expected_warning=DeprecationWarning):
+        S3PrefixSensor(task_id='s3_prefix', bucket_name='bucket', prefix='prefix')
 
-        mock_hook.return_value.check_for_prefix.return_value = False
-        assert not op.poke(None)
-        mock_hook.return_value.check_for_prefix.assert_called_once_with(
-            prefix='prefix', delimiter='/', bucket_name='bucket'
-        )
 
-        mock_hook.return_value.check_for_prefix.return_value = True
-        assert op.poke(None)
+@mock.patch('airflow.providers.amazon.aws.sensors.s3.S3Hook.head_object')
+def test_poke(mock_head_object):
+    op = S3PrefixSensor(task_id='s3_prefix', bucket_name='bucket', prefix='prefix')
+
+    mock_head_object.return_value = None
+    assert not op.poke({})
+    mock_head_object.assert_called_once_with('prefix/', 'bucket')
+
+    mock_head_object.return_value = {'ContentLength': 0}
+    assert op.poke({})
+
+
+@mock.patch('airflow.providers.amazon.aws.sensors.s3.S3Hook.head_object')
+def test_poke_should_check_multiple_prefixes(mock_head_object):
+    op = S3PrefixSensor(task_id='s3_prefix', bucket_name='bucket', prefix=['prefix1', 'prefix2/'])
+
+    mock_head_object.return_value = None
+    assert not op.poke({}), "poke returns false when the prefixes do not exist"
+
+    mock_head_object.assert_has_calls(
+        calls=[
+            call('prefix1/', 'bucket'),
+        ]
+    )
+
+    mock_head_object.side_effect = [{'ContentLength': 0}, None]
+    assert not op.poke({}), "poke returns false when only some of the prefixes exist"
+
+    mock_head_object.side_effect = [{'ContentLength': 0}, {'ContentLength': 0}]
+    assert op.poke({}), "poke returns true when both prefixes exist"
+
+    mock_head_object.assert_has_calls(
+        calls=[
+            call('prefix1/', 'bucket'),
+            call('prefix2/', 'bucket'),
+        ]
+    )

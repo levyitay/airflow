@@ -23,9 +23,9 @@
 
 If you're new to modern frontend development or parts of our stack, you may want to check out these resources to understand our codebase:
 
-- Typescript is an extension of javascript to add type-checking to our app. Files ending in `.ts` or `.tsx` will be type-checked. Check out the [handbook](https://www.typescriptlang.org/docs/handbook/typescript-in-5-minutes-func.html) for an introduction or feel free to keep this [cheatsheet](https://github.com/typescript-cheatsheets/react) open while developing.
+- TypeScript is an extension of javascript to add type-checking to our app. Files ending in `.ts` or `.tsx` will be type-checked. Check out the [handbook](https://www.typescriptlang.org/docs/handbook/typescript-in-5-minutes-func.html) for an introduction or feel free to keep this [cheatsheet](https://github.com/typescript-cheatsheets/react) open while developing.
 
-- React powers our entire app so it would be valuable to learn JSX, the html-in-js templates React utilizes. Files that contain JSX will end in `.tsx` instead of `.ts`. Check out their official [tutorial](https://reactjs.org/tutorial/tutorial.html#overview) for a basic overview.
+- React powers our entire app, so it would be valuable to learn JSX, the html-in-js templates React utilizes. Files that contain JSX will end in `.tsx` instead of `.ts`. Check out their official [tutorial](https://reactjs.org/tutorial/tutorial.html#overview) for a basic overview.
 
 - Chakra-UI is our component library and theming system. You'll notice we have no traditional css nor html tags. This is all handled in Chakra with importing standard components like `<Box>` or `<Text>` that are styled globally in `src/theme.ts` file and then by passing styles as component props. Check out their [docs](https://chakra-ui.com/docs/getting-started) to see all the included components and hooks.
 
@@ -34,7 +34,7 @@ the more confidence they can give you." Keep their [cheatsheet](https://testing-
 
 - Neutrino handles our App's configuration and Webpack build. Check out their [docs](https://neutrinojs.org/api/) if you need to customize it.
 
-- State management is handled with [Context](https://reactjs.org/docs/context.html) and [react-query](https://react-query.tanstack.com/). Context is used for App-level state that doesn't change often (authentication, dark/light mode). React Query handles all the state and side effects (loading, error, caching, etc) of async data from the API.
+- State management is handled with [Context](https://reactjs.org/docs/context.html) and [react-query](https://react-query.tanstack.com/). Context is used for App-level state that doesn't change frequently (authentication, dark/light mode). React Query handles all the state and side effects (loading, error, caching, etc.) of async data from the API.
 
 ## Project Structure
 
@@ -42,7 +42,7 @@ the more confidence they can give you." Keep their [cheatsheet](https://testing-
 - `.neutrinorc.js` is the main config file. Although some custom typescript or linting may need to be changed in `tsconfig.json` or `.eslintrc.js`, respectively
 - `src/components` are React components that will be shared across the app
 - `src/views` are React components that are specific to a certain url route
-- `src/interfaces` are custom-defined Typescript types/interfaces
+- `src/interfaces` are custom-defined TypeScript types/interfaces
 - `src/utils` contains various helper functions that are shared throughout the app
 - `src/auth` has the Context for authentication
 - `src/api` contains all of the actual API requests as custom hooks around react-query

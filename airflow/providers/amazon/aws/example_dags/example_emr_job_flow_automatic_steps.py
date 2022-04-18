@@ -15,23 +15,15 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
-"""
-This is an example dag for a AWS EMR Pipeline with auto steps.
-"""
-from datetime import timedelta
+import os
+from datetime import datetime
 
 from airflow import DAG
-from airflow.providers.amazon.aws.operators.emr_create_job_flow import EmrCreateJobFlowOperator
-from airflow.providers.amazon.aws.sensors.emr_job_flow import EmrJobFlowSensor
-from airflow.utils.dates import days_ago
+from airflow.providers.amazon.aws.operators.emr import EmrCreateJobFlowOperator
+from airflow.providers.amazon.aws.sensors.emr import EmrJobFlowSensor
 
-DEFAULT_ARGS = {
-    'owner': 'airflow',
-    'depends_on_past': False,
-    'email': ['airflow@example.com'],
-    'email_on_failure': False,
-    'email_on_retry': False,
-}
+JOB_FLOW_ROLE = os.getenv('EMR_JOB_FLOW_ROLE', 'EMR_EC2_DefaultRole')
+SERVICE_ROLE = os.getenv('EMR_SERVICE_ROLE', 'EMR_DefaultRole')
 
 # [START howto_operator_emr_automatic_steps_config]
 SPARK_STEPS = [
@@ -48,47 +40,45 @@ SPARK_STEPS = [
 JOB_FLOW_OVERRIDES = {
     'Name': 'PiCalc',
     'ReleaseLabel': 'emr-5.29.0',
+    'Applications': [{'Name': 'Spark'}],
     'Instances': {
         'InstanceGroups': [
             {
-                'Name': 'Master node',
-                'Market': 'SPOT',
+                'Name': 'Primary node',
+                'Market': 'ON_DEMAND',
                 'InstanceRole': 'MASTER',
-                'InstanceType': 'm1.medium',
+                'InstanceType': 'm5.xlarge',
                 'InstanceCount': 1,
-            }
+            },
         ],
         'KeepJobFlowAliveWhenNoSteps': False,
         'TerminationProtected': False,
     },
     'Steps': SPARK_STEPS,
-    'JobFlowRole': 'EMR_EC2_DefaultRole',
-    'ServiceRole': 'EMR_DefaultRole',
+    'JobFlowRole': JOB_FLOW_ROLE,
+    'ServiceRole': SERVICE_ROLE,
 }
 # [END howto_operator_emr_automatic_steps_config]
 
+
 with DAG(
-    dag_id='emr_job_flow_automatic_steps_dag',
-    default_args=DEFAULT_ARGS,
-    dagrun_timeout=timedelta(hours=2),
-    start_date=days_ago(2),
-    schedule_interval='0 3 * * *',
+    dag_id='example_emr_job_flow_automatic_steps',
+    schedule_interval=None,
+    start_date=datetime(2021, 1, 1),
     tags=['example'],
+    catchup=False,
 ) as dag:
 
-    # [START howto_operator_emr_automatic_steps_tasks]
+    # [START howto_operator_emr_create_job_flow]
     job_flow_creator = EmrCreateJobFlowOperator(
         task_id='create_job_flow',
         job_flow_overrides=JOB_FLOW_OVERRIDES,
-        aws_conn_id='aws_default',
-        emr_conn_id='emr_default',
     )
+    # [END howto_operator_emr_create_job_flow]
 
+    # [START howto_sensor_emr_job_flow_sensor]
     job_sensor = EmrJobFlowSensor(
         task_id='check_job_flow',
-        job_flow_id="{{ task_instance.xcom_pull(task_ids='create_job_flow', key='return_value') }}",
-        aws_conn_id='aws_default',
+        job_flow_id=job_flow_creator.output,
     )
-
-    job_flow_creator >> job_sensor
-    # [END howto_operator_emr_automatic_steps_tasks]
+    # [END howto_sensor_emr_job_flow_sensor]

@@ -24,10 +24,6 @@ Cloud Storage allows world-wide storage and retrieval of any amount of data at a
 You can use Cloud Storage for a range of scenarios including serving website content,
 storing data for archival and disaster recovery, or distributing large data objects to users via direct download.
 
-.. contents::
-  :depth: 1
-  :local:
-
 Prerequisite Tasks
 ^^^^^^^^^^^^^^^^^^
 
@@ -45,8 +41,9 @@ Use the
 :class:`~airflow.providers.google.cloud.transfers.gcs_to_bigquery.GCSToBigQueryOperator`
 to execute a BigQuery load job.
 
-.. exampleinclude:: /../../airflow/providers/google/cloud/example_dags/example_gcs_to_bigquery.py
+.. exampleinclude:: /../../tests/system/providers/google/gcs/example_gcs_to_bigquery.py
     :language: python
+    :dedent: 4
     :start-after: [START howto_operator_gcs_to_bigquery]
     :end-before: [END howto_operator_gcs_to_bigquery]
 
@@ -58,14 +55,14 @@ GCSTimeSpanFileTransformOperator
 
 Use the
 :class:`~airflow.providers.google.cloud.operators.gcs.GCSTimeSpanFileTransformOperator`
-to transform files that were modified in a specific time span. The time span is defined
-by the DAG instance logical execution timestamp (``execution_date``, start of time span)
-and the timestamp when the next DAG instance execution is scheduled (end of time span). If a DAG
+to transform files that were modified in a specific time span (the data interval).
+The time span is defined by the time span's start and end timestamps. If a DAG
 does not have a *next* DAG instance scheduled, the time span end infinite, meaning the operator
-processes all files older than ``execution_date``.
+processes all files older than ``data_interval_start``.
 
 .. exampleinclude:: /../../airflow/providers/google/cloud/example_dags/example_gcs_timespan_file_transform.py
     :language: python
+    :dedent: 4
     :start-after: [START howto_operator_gcs_timespan_file_transform_operator_Task]
     :end-before: [END howto_operator_gcs_timespan_file_transform_operator_Task]
 
@@ -195,6 +192,32 @@ Use the :class:`~airflow.providers.google.cloud.sensors.gcs.GCSObjectsWithPrefix
     :dedent: 4
     :start-after: [START howto_sensor_object_with_prefix_exists_task]
     :end-before: [END howto_sensor_object_with_prefix_exists_task]
+
+.. _howto/sensor:GCSUploadSessionCompleteSensor:
+
+GCSUploadSessionCompleteSensor
+------------------------------
+
+Use the :class:`~airflow.providers.google.cloud.sensors.gcs.GCSUploadSessionCompleteSensor` to check for a change in the number of files with a specified prefix in Google Cloud Storage.
+
+.. exampleinclude:: /../../airflow/providers/google/cloud/example_dags/example_gcs.py
+    :language: python
+    :dedent: 4
+    :start-after: [START howto_sensor_gcs_upload_session_complete_task]
+    :end-before: [END howto_sensor_gcs_upload_session_complete_task]
+
+.. _howto/sensor:GCSObjectUpdateSensor:
+
+GCSObjectUpdateSensor
+---------------------
+
+Use the :class:`~airflow.providers.google.cloud.sensors.gcs.GCSObjectUpdateSensor` to check if an object is updated in Google Cloud Storage.
+
+.. exampleinclude:: /../../airflow/providers/google/cloud/example_dags/example_gcs.py
+    :language: python
+    :dedent: 4
+    :start-after: [START howto_sensor_object_update_exists_task]
+    :end-before: [END howto_sensor_object_update_exists_task]
 
 More information
 """"""""""""""""

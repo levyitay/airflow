@@ -19,6 +19,105 @@
 Changelog
 ---------
 
+3.3.0
+.....
+
+Features
+~~~~~~~~
+
+* ``Add recipe for BeamRunGoPipelineOperator (#22296)``
+
+Bug Fixes
+~~~~~~~~~
+
+* ``Fix mistakenly added install_requires for all providers (#22382)``
+
+3.2.1
+.....
+
+Misc
+~~~~~
+
+* ``Add Trove classifiers in PyPI (Framework :: Apache Airflow :: Provider)``
+
+3.2.0
+.....
+
+Features
+~~~~~~~~
+
+* ``Add support for BeamGoPipelineOperator (#20386)``
+
+Misc
+~~~~
+
+* ``Support for Python 3.10``
+
+
+.. Below changes are excluded from the changelog. Move them to
+   appropriate section above if needed. Do not delete the lines(!):
+   * ``Fixed changelog for January 2022 (delayed) provider's release (#21439)``
+   * ``Fix mypy apache beam operators (#20610)``
+   * ``Fix K8S changelog to be PyPI-compatible (#20614)``
+   * ``Fix template_fields type to have MyPy friendly Sequence type (#20571)``
+   * ``Fix MyPy Errors for Apache Beam (and Dataflow) provider. (#20301)``
+   * ``Fix broken anchors markdown files (#19847)``
+   * ``Add documentation for January 2021 providers release (#21257)``
+   * ``Dataflow Assets (#21639)``
+   * ``Remove ':type' lines now sphinx-autoapi supports typehints (#20951)``
+   * ``Update documentation for provider December 2021 release (#20523)``
+   * ``Use typed Context EVERYWHERE (#20565)``
+   * ``Update documentation for November 2021 provider's release (#19882)``
+   * ``Cleanup of start_date and default arg use for Apache example DAGs (#18657)``
+
+3.1.0
+.....
+
+Features
+~~~~~~~~
+
+* ``Use google cloud credentials when executing beam command in subprocess (#18992)``
+
+.. Below changes are excluded from the changelog. Move them to
+   appropriate section above if needed. Do not delete the lines(!):
+
+3.0.1
+.....
+
+Misc
+~~~~
+
+* ``Optimise connection importing for Airflow 2.2.0``
+
+.. Below changes are excluded from the changelog. Move them to
+   appropriate section above if needed. Do not delete the lines(!):
+   * ``Fixed wrongly escaped characters in amazon's changelog (#17020)``
+   * ``Prepares docs for Rc2 release of July providers (#17116)``
+   * ``Prepare documentation for July release of providers. (#17015)``
+   * ``Removes pylint from our toolchain (#16682)``
+
+3.0.0
+.....
+
+Breaking changes
+~~~~~~~~~~~~~~~~
+
+* ``Auto-apply apply_default decorator (#15667)``
+
+.. warning:: Due to apply_default decorator removal, this version of the provider requires Airflow 2.1.0+.
+   If your Airflow version is < 2.1.0, and you want to install this provider version, first upgrade
+   Airflow to at least version 2.1.0. Otherwise your Airflow package version will be upgraded
+   automatically and you will have to manually run ``airflow upgrade db`` to complete the migration.
+
+.. Below changes are excluded from the changelog. Move them to
+   appropriate section above if needed. Do not delete the lines(!):
+   * ``Rename the main branch of the Airflow repo to be main (#16149)``
+   * ``Check synctatic correctness for code-snippets (#16005)``
+   * ``Rename example bucket names to use INVALID BUCKET NAME by default (#15651)``
+   * ``Updated documentation for June 2021 provider release (#16294)``
+   * ``More documentation update for June providers release (#16405)``
+   * ``Synchronizes updated changelog after buggfix release (#16464)``
+
 2.0.0
 .....
 
@@ -51,17 +150,19 @@ This is the extra for the ``google`` provider:
 
 .. code-block:: python
 
-        extras_require={
-            ...
-            'apache.beam': ['apache-airflow-providers-apache-beam', 'apache-beam[gcp]'],
-            ....
-        },
+        extras_require = (
+            {
+                # ...
+                "apache.beam": ["apache-airflow-providers-apache-beam", "apache-beam[gcp]"],
+                # ...
+            },
+        )
 
 And likewise this is the extra for the ``apache.beam`` provider:
 
 .. code-block:: python
 
-        extras_require={'google': ['apache-airflow-providers-google', 'apache-beam[gcp]']},
+        extras_require = ({"google": ["apache-airflow-providers-google", "apache-beam[gcp]"]},)
 
 You can still run this with PIP version <= 20.2.4 and go back to the previous behaviour:
 

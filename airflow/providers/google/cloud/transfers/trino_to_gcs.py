@@ -22,7 +22,6 @@ from trino.dbapi import Cursor as TrinoCursor
 
 from airflow.providers.google.cloud.transfers.sql_to_gcs import BaseSQLToGCSOperator
 from airflow.providers.trino.hooks.trino import TrinoHook
-from airflow.utils.decorators import apply_defaults
 
 
 class _TrinoToGCSTrinoCursorAdapter:
@@ -145,7 +144,6 @@ class TrinoToGCSOperator(BaseSQLToGCSOperator):
     """Copy data from TrinoDB to Google Cloud Storage in JSON or CSV format.
 
     :param trino_conn_id: Reference to a specific Trino hook.
-    :type trino_conn_id: str
     """
 
     ui_color = "#a0e08c"
@@ -175,7 +173,6 @@ class TrinoToGCSOperator(BaseSQLToGCSOperator):
         "UUID": "STRING",
     }
 
-    @apply_defaults
     def __init__(self, *, trino_conn_id: str = "trino_default", **kwargs):
         super().__init__(**kwargs)
         self.trino_conn_id = trino_conn_id
@@ -203,8 +200,6 @@ class TrinoToGCSOperator(BaseSQLToGCSOperator):
         Do nothing. Trino uses JSON on the transport layer, so types are simple.
 
         :param value: Trino column value
-        :type value: Any
         :param schema_type: BigQuery data type
-        :type schema_type: str
         """
         return value

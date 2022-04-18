@@ -16,7 +16,6 @@
 # specific language governing permissions and limitations
 # under the License.
 
-# pylint: disable=too-many-lines
 
 import os
 import unittest
@@ -149,9 +148,7 @@ class TestCloudSql(unittest.TestCase):
         op = CloudSQLCreateInstanceOperator(
             project_id=PROJECT_ID, instance=INSTANCE_NAME, body=CREATE_BODY, task_id="id"
         )
-        result = op.execute(
-            context={'task_instance': mock.Mock()}  # pylint: disable=assignment-from-no-return
-        )
+        op.execute(context={'task_instance': mock.Mock()})
         mock_hook.assert_called_once_with(
             api_version="v1beta4",
             gcp_conn_id="google_cloud_default",
@@ -160,7 +157,6 @@ class TestCloudSql(unittest.TestCase):
         mock_hook.return_value.create_instance.assert_called_once_with(
             project_id=PROJECT_ID, body=CREATE_BODY
         )
-        assert result is None
 
     @mock.patch(
         "airflow.providers.google.cloud.operators.cloud_sql"
@@ -171,16 +167,13 @@ class TestCloudSql(unittest.TestCase):
         _check_if_instance_exists.return_value = False
         mock_hook.return_value.create_instance.return_value = True
         op = CloudSQLCreateInstanceOperator(instance=INSTANCE_NAME, body=CREATE_BODY, task_id="id")
-        result = op.execute(
-            context={'task_instance': mock.Mock()}  # pylint: disable=assignment-from-no-return
-        )
+        op.execute(context={'task_instance': mock.Mock()})
         mock_hook.assert_called_once_with(
             api_version="v1beta4",
             gcp_conn_id="google_cloud_default",
             impersonation_chain=None,
         )
         mock_hook.return_value.create_instance.assert_called_once_with(project_id=None, body=CREATE_BODY)
-        assert result is None
 
     @mock.patch(
         "airflow.providers.google.cloud.operators.cloud_sql"
@@ -193,16 +186,13 @@ class TestCloudSql(unittest.TestCase):
         op = CloudSQLCreateInstanceOperator(
             project_id=PROJECT_ID, instance=INSTANCE_NAME, body=CREATE_BODY, task_id="id"
         )
-        result = op.execute(
-            context={'task_instance': mock.Mock()}  # pylint: disable=assignment-from-no-return
-        )
+        op.execute(context={'task_instance': mock.Mock()})
         mock_hook.assert_called_once_with(
             api_version="v1beta4",
             gcp_conn_id="google_cloud_default",
             impersonation_chain=None,
         )
         mock_hook.return_value.create_instance.assert_not_called()
-        assert result is None
 
     @mock.patch("airflow.providers.google.cloud.operators.cloud_sql.CloudSQLHook")
     def test_create_should_throw_ex_when_empty_project_id(self, mock_hook):
@@ -749,17 +739,9 @@ class TestCloudSqlQueryValidation(unittest.TestCase):
         get_connection,
     ):
         uri = (
-            "gcpcloudsql://user:password@127.0.0.1:3200/testdb?"
-            "database_type={database_type}&"
-            "project_id={project_id}&location={location}&instance={instance_name}&"
-            "use_proxy={use_proxy}&use_ssl={use_ssl}".format(
-                database_type=database_type,
-                project_id=project_id,
-                location=location,
-                instance_name=instance_name,
-                use_proxy=use_proxy,
-                use_ssl=use_ssl,
-            )
+            f"gcpcloudsql://user:password@127.0.0.1:3200/testdb?"
+            f"database_type={database_type}&project_id={project_id}&location={location}"
+            f"&instance={instance_name}&use_proxy={use_proxy}&use_ssl={use_ssl}"
         )
         self._setup_connections(get_connection, uri)
         with pytest.raises(AirflowException) as ctx:
@@ -773,9 +755,7 @@ class TestCloudSqlQueryValidation(unittest.TestCase):
         uri = (
             "gcpcloudsql://user:password@127.0.0.1:3200/testdb?database_type=postgres&"
             "project_id=example-project&location=europe-west1&"
-            "instance="
-            "test_db_with_long_name_a_bit_above"
-            "_the_limit_of_UNIX_socket_asdadadasadasd&"
+            "instance=test_db_with_long_name_a_bit_above_the_limit_of_UNIX_socket_asdadadasadasd&"
             "use_proxy=True&sql_proxy_use_tcp=False"
         )
         self._setup_connections(get_connection, uri)

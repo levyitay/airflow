@@ -18,6 +18,8 @@
 
 import unittest
 
+import pytest
+
 from airflow.utils.trigger_rule import TriggerRule
 
 
@@ -26,10 +28,16 @@ class TestTriggerRule(unittest.TestCase):
         assert TriggerRule.is_valid(TriggerRule.ALL_SUCCESS)
         assert TriggerRule.is_valid(TriggerRule.ALL_FAILED)
         assert TriggerRule.is_valid(TriggerRule.ALL_DONE)
+        assert TriggerRule.is_valid(TriggerRule.ALL_SKIPPED)
         assert TriggerRule.is_valid(TriggerRule.ONE_SUCCESS)
         assert TriggerRule.is_valid(TriggerRule.ONE_FAILED)
         assert TriggerRule.is_valid(TriggerRule.NONE_FAILED)
         assert TriggerRule.is_valid(TriggerRule.NONE_FAILED_OR_SKIPPED)
         assert TriggerRule.is_valid(TriggerRule.NONE_SKIPPED)
         assert TriggerRule.is_valid(TriggerRule.DUMMY)
-        assert len(TriggerRule.all_triggers()) == 9
+        assert TriggerRule.is_valid(TriggerRule.ALWAYS)
+        assert TriggerRule.is_valid(TriggerRule.NONE_FAILED_MIN_ONE_SUCCESS)
+        assert len(TriggerRule.all_triggers()) == 12
+
+        with pytest.raises(ValueError):
+            TriggerRule("NOT_EXIST_TRIGGER_RULE")

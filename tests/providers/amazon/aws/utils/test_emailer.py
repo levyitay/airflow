@@ -16,27 +16,40 @@
 # specific language governing permissions and limitations
 # under the License.
 #
+from unittest import TestCase, mock
 
-from unittest import mock
+import pytest
 
 from airflow.providers.amazon.aws.utils.emailer import send_email
 
 
-@mock.patch("airflow.providers.amazon.aws.utils.emailer.SESHook")
-def test_send_email(mock_hook):
-    send_email(
-        to="to@test.com",
-        subject="subject",
-        html_content="content",
-    )
-    mock_hook.return_value.send_email.assert_called_once_with(
-        mail_from=None,
-        to="to@test.com",
-        subject="subject",
-        html_content="content",
-        bcc=None,
-        cc=None,
-        files=None,
-        mime_charset="utf-8",
-        mime_subtype="mixed",
-    )
+class TestSendEmailSes(TestCase):
+    @mock.patch("airflow.providers.amazon.aws.utils.emailer.SesHook")
+    def test_send_ses_email(self, mock_hook):
+        send_email(
+            to="to@test.com",
+            subject="subject",
+            html_content="content",
+            from_email="From Test <from@test.com>",
+            custom_headers={"X-Test-Header": "test-val"},
+        )
+
+        mock_hook.return_value.send_email.assert_called_once_with(
+            mail_from="From Test <from@test.com>",
+            to="to@test.com",
+            subject="subject",
+            html_content="content",
+            bcc=None,
+            cc=None,
+            files=None,
+            mime_charset="utf-8",
+            mime_subtype="mixed",
+            custom_headers={"X-Test-Header": "test-val"},
+        )
+
+    @mock.patch("airflow.providers.amazon.aws.utils.emailer.SesHook")
+    def test_send_ses_email_no_from_mail(self, mock_hook):
+        with pytest.raises(
+            RuntimeError, match="The `from_email' configuration has to be set for the SES emailer."
+        ):
+            send_email(to="to@test.com", subject="subject", html_content="content")

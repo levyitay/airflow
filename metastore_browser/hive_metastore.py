@@ -23,8 +23,9 @@ from datetime import datetime
 from typing import List
 
 import pandas as pd
-from flask import Blueprint, Markup, request
+from flask import Blueprint, request
 from flask_appbuilder import BaseView, expose
+from markupsafe import Markup
 
 from airflow.plugins_manager import AirflowPlugin
 from airflow.providers.apache.hive.hooks.hive import HiveCliHook, HiveMetastoreHook
@@ -126,10 +127,10 @@ class MetastoreBrowserView(BaseView):
         """Retrieve objects from TBLS and DBS"""
         where_clause = ''
         if DB_ALLOW_LIST:
-            dbs = ",".join(["'" + db + "'" for db in DB_ALLOW_LIST])
+            dbs = ",".join("'" + db + "'" for db in DB_ALLOW_LIST)
             where_clause = f"AND b.name IN ({dbs})"
         if DB_DENY_LIST:
-            dbs = ",".join(["'" + db + "'" for db in DB_DENY_LIST])
+            dbs = ",".join("'" + db + "'" for db in DB_DENY_LIST)
             where_clause = f"AND b.name NOT IN ({dbs})"
         sql = f"""
         SELECT CONCAT(b.NAME, '.', a.TBL_NAME), TBL_TYPE

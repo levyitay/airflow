@@ -34,7 +34,8 @@ fi
 
 TERRAFORM_VERSION="0.14.4"
 TERRAFORM_BASE_URL="https://releases.hashicorp.com/terraform"
-TERRAFORM_ZIP="terraform_${TERRAFORM_VERSION}_$(uname | tr '[:upper:]' '[:lower:]')_amd64.zip"
+TERRAFOR_PLATFORM=$([ "$(uname -m)" = "aarch64" ] && echo "arm64" || echo "amd64" )
+TERRAFORM_ZIP="terraform_${TERRAFORM_VERSION}_$(uname | tr '[:upper:]' '[:lower:]')${TERRAFOR_PLATFORM}.zip"
 DOWNLOAD_URL="${TERRAFORM_BASE_URL}/${TERRAFORM_VERSION}/${TERRAFORM_ZIP}"
 TMP_DIR="$(mktemp -d)"
 
@@ -47,7 +48,7 @@ curl -# --fail "${DOWNLOAD_URL}" --output "${TMP_DIR}/terraform.zip"
 echo "Extracting archive"
 unzip "${TMP_DIR}/terraform.zip" -d /files/bin
 
-# Sanity check
+# Coherence check
 if ! command -v terraform > /dev/null; then
     echo 'Installation failed. The command "terraform" was not found.'
     exit 1

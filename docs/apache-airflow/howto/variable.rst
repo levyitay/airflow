@@ -53,6 +53,7 @@ You can use them in your DAGs as:
 .. code-block:: python
 
     from airflow.models import Variable
+
     foo = Variable.get("foo")
     foo_json = Variable.get("foo_baz", deserialize_json=True)
 
@@ -61,7 +62,8 @@ You can use them in your DAGs as:
     Single underscores surround ``VAR``.  This is in contrast with the way ``airflow.cfg``
     parameters are stored, where double underscores surround the config section name.
     Variables set using Environment Variables would not appear in the Airflow UI but you will
-    be able to use them in your DAG file.
+    be able to use them in your DAG file. Variables set using Environment Variables will also
+    take precedence over variables defined in the Airflow UI.
 
 Securing Variables
 ------------------

@@ -22,7 +22,6 @@ Please use :mod:`airflow.providers.mysql.transfers.vertica_to_mysql`.
 
 import warnings
 
-# pylint: disable=unused-import
 from airflow.providers.mysql.transfers.vertica_to_mysql import VerticaToMySqlOperator
 
 warnings.warn(
@@ -45,6 +44,6 @@ class VerticaToMySqlTransfer(VerticaToMySqlOperator):
             Please use
             `airflow.providers.mysql.transfers.vertica_to_mysql.VerticaToMySqlOperator`.""",
             DeprecationWarning,
-            stacklevel=3,
+            stacklevel=2,
         )
         super().__init__(*args, **kwargs)

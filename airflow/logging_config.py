@@ -53,9 +53,20 @@ def configure_logging():
         log.debug('Unable to load custom logging, using default config instead')
 
     try:
+        # Ensure that the password masking filter is applied to the 'task' handler
+        # no matter what the user did.
+        if 'filters' in logging_config and 'mask_secrets' in logging_config['filters']:
+            # But if they replace the logging config _entirely_, don't try to set this, it won't work
+            task_handler_config = logging_config['handlers']['task']
+
+            task_handler_config.setdefault('filters', [])
+
+            if 'mask_secrets' not in task_handler_config['filters']:
+                task_handler_config['filters'].append('mask_secrets')
+
         # Try to init logging
         dictConfig(logging_config)
-    except ValueError as e:
+    except (ValueError, KeyError) as e:
         log.error('Unable to load the config, contains a configuration error.')
         # When there is an error in the config, escalate the exception
         # otherwise Airflow would silently fall back on the default config
@@ -66,7 +77,7 @@ def configure_logging():
     return logging_class_path
 
 
-def validate_logging_config(logging_config):  # pylint: disable=unused-argument
+def validate_logging_config(logging_config):
     """Validate the provided Logging Config"""
     # Now lets validate the other logging-related settings
     task_log_reader = conf.get('logging', 'task_log_reader')
@@ -80,18 +91,14 @@ def validate_logging_config(logging_config):  # pylint: disable=unused-argument
         # Check for pre 1.10 setting that might be in deployed airflow.cfg files
         if task_log_reader == "file.task" and _get_handler("task"):
             warnings.warn(
-                "task_log_reader setting in [logging] has a deprecated value of "
-                "{!r}, but no handler with this name was found. Please update "
-                "your config to use {!r}. Running config has been adjusted to "
-                "match".format(
-                    task_log_reader,
-                    "task",
-                ),
+                f"task_log_reader setting in [logging] has a deprecated value of {task_log_reader!r}, "
+                "but no handler with this name was found. Please update your config to use task. "
+                "Running config has been adjusted to match",
                 DeprecationWarning,
             )
             conf.set('logging', 'task_log_reader', 'task')
         else:
             raise AirflowConfigException(
-                "Configured task_log_reader {!r} was not a handler of the 'airflow.task' "
-                "logger.".format(task_log_reader)
+                f"Configured task_log_reader {task_log_reader!r} was not a handler of "
+                f"the 'airflow.task' logger."
             )

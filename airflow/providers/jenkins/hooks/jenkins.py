@@ -17,11 +17,13 @@
 # under the License.
 #
 
-from distutils.util import strtobool
+from typing import Optional
 
 import jenkins
 
+from airflow import AirflowException
 from airflow.hooks.base import BaseHook
+from airflow.utils.strings import to_boolean
 
 
 class JenkinsHook(BaseHook):
@@ -38,11 +40,7 @@ class JenkinsHook(BaseHook):
         self.connection = connection
         connection_prefix = 'http'
         # connection.extra contains info about using https (true) or http (false)
-        if connection.extra is None or connection.extra == '':
-            connection.extra = 'false'
-            # set a default value to connection.extra
-            # to avoid rising ValueError in strtobool
-        if strtobool(connection.extra):
+        if to_boolean(connection.extra):
             connection_prefix = 'https'
         url = f'{connection_prefix}://{connection.host}:{connection.port}'
         self.log.info('Trying to connect to %s', url)
@@ -51,3 +49,20 @@ class JenkinsHook(BaseHook):
     def get_jenkins_server(self) -> jenkins.Jenkins:
         """Get jenkins server"""
         return self.jenkins_server
+
+    def get_build_building_state(self, job_name: str, build_number: Optional[int]) -> bool:
+        """Get build building state"""
+        try:
+            if not build_number:
+                self.log.info("Build number not specified, getting latest build info from Jenkins")
+                job_info = self.jenkins_server.get_job_info(job_name)
+                build_number_to_check = job_info['lastBuild']['number']
+            else:
+                build_number_to_check = build_number
+
+            self.log.info("Getting build info for %s build number: #%s", job_name, build_number_to_check)
+            build_info = self.jenkins_server.get_build_info(job_name, build_number_to_check)
+            building = build_info['building']
+            return building
+        except jenkins.JenkinsException as err:
+            raise AirflowException(f'Jenkins call failed with error : {err}')

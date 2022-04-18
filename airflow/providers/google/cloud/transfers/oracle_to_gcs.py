@@ -15,7 +15,7 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
-# pylint: disable=c-extension-no-member
+
 import base64
 import calendar
 from datetime import date, datetime, timedelta
@@ -26,7 +26,6 @@ import cx_Oracle
 
 from airflow.providers.google.cloud.transfers.sql_to_gcs import BaseSQLToGCSOperator
 from airflow.providers.oracle.hooks.oracle import OracleHook
-from airflow.utils.decorators import apply_defaults
 
 
 class OracleToGCSOperator(BaseSQLToGCSOperator):
@@ -36,12 +35,11 @@ class OracleToGCSOperator(BaseSQLToGCSOperator):
         For more information on how to use this operator, take a look at the guide:
         :ref:`howto/operator:OracleToGCSOperator`
 
-    :param oracle_conn_id: Reference to a specific Oracle hook.
-    :type oracle_conn_id: str
+    :param oracle_conn_id: Reference to a specific
+        :ref:`Oracle hook <howto/connection:oracle>`.
     :param ensure_utc: Ensure TIMESTAMP columns exported as UTC. If set to
         `False`, TIMESTAMP columns will be exported using the Oracle server's
         default timezone.
-    :type ensure_utc: bool
     """
 
     ui_color = '#a0e08c'
@@ -58,7 +56,6 @@ class OracleToGCSOperator(BaseSQLToGCSOperator):
         cx_Oracle.DB_TYPE_TIMESTAMP_TZ: 'TIMESTAMP',
     }
 
-    @apply_defaults
     def __init__(self, *, oracle_conn_id='oracle_default', ensure_utc=False, **kwargs):
         super().__init__(**kwargs)
         self.ensure_utc = ensure_utc
@@ -103,9 +100,7 @@ class OracleToGCSOperator(BaseSQLToGCSOperator):
           https://cloud.google.com/bigquery/data-types
 
         :param value: Oracle db column value
-        :type value: Any
         :param schema_type: BigQuery data type
-        :type schema_type: str
         """
         if value is None:
             return value

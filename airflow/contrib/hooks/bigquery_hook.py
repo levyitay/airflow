@@ -19,13 +19,11 @@
 
 import warnings
 
-# pylint: disable=unused-import
 from airflow.providers.google.cloud.hooks.bigquery import (  # noqa
     BigQueryBaseCursor,
     BigQueryConnection,
     BigQueryCursor,
     BigQueryHook,
-    BigQueryPandasConnector,
     GbqConnector,
 )
 

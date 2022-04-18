@@ -17,17 +17,18 @@
 
 
 
+.. _howto/operator:LevelDBOperator:
+
 Google LevelDB Operator
 ================================
 
 `LevelDB <https://github.com/google/leveldb>`__ is a fast key-value storage library written at Google that provides
 an ordered mapping from string keys to string values.
 
-.. contents::
-  :depth: 1
-  :local:
+.. note::
 
-.. _howto/operator:LevelDBOperator:
+    To use LevelDB hooks and operators you must requires installation of ``plyvel``.  It will be
+    installed if you specify the extra ``apache-airflow-providers-google[leveldb]``.
 
 Put key
 ^^^^^^^^^^^^^^^

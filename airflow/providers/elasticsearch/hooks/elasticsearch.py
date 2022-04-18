@@ -30,8 +30,8 @@ class ElasticsearchHook(DbApiHook):
 
     This hook uses the Elasticsearch conn_id.
 
-    :param elasticsearch_conn_id: The Airflow connection used for Elasticsearch credentials.
-    :type elasticsearch_conn_id: str
+    :param elasticsearch_conn_id: The :ref:`ElasticSearch connection id <howto/connection:elasticsearch>`
+        used for Elasticsearch credentials.
     """
 
     conn_name_attr = 'elasticsearch_conn_id'

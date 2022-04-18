@@ -16,7 +16,14 @@
 # specific language governing permissions and limitations
 # under the License.
 
-set -euo pipefail
+set -eo pipefail
+
+if [[ $(uname -s) != "Darwin" ]]; then
+    # do not fail with undefined variable on MacOS. The old Bash which is default on Mac OS
+    # fails with undefined variable when you are passing an empty variable and this causes
+    # problems for example when you try to pass empty list of arguments "${@}"
+    set -u
+fi
 
 export AIRFLOW_SOURCES="${AIRFLOW_SOURCES:=$( cd "$( dirname "${BASH_SOURCE[0]}" )/../../.." && pwd )}"
 readonly AIRFLOW_SOURCES
@@ -24,7 +31,11 @@ readonly AIRFLOW_SOURCES
 # shellcheck source=scripts/ci/libraries/_all_libs.sh
 . "${AIRFLOW_SOURCES}/scripts/ci/libraries/_all_libs.sh"
 
+initialization::create_directories
+
 initialization::initialize_common_environment
+
+initialization::check_docker_version
 
 sanity_checks::basic_sanity_checks
 
@@ -34,7 +45,7 @@ build_images::determine_docker_cache_strategy
 
 initialization::get_environment_for_builds_on_ci
 
-build_images::get_docker_image_names
+build_images::get_docker_cache_image_names
 
 initialization::make_constants_read_only
 

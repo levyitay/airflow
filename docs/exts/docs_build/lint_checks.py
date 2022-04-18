@@ -22,8 +22,8 @@ from glob import glob
 from itertools import chain
 from typing import Iterable, List, Optional, Set
 
-from docs.exts.docs_build.docs_builder import ALL_PROVIDER_YAMLS  # pylint: disable=no-name-in-module
-from docs.exts.docs_build.errors import DocBuildError  # pylint: disable=no-name-in-module
+from docs.exts.docs_build.docs_builder import ALL_PROVIDER_YAMLS
+from docs.exts.docs_build.errors import DocBuildError
 
 ROOT_PROJECT_DIR = os.path.abspath(
     os.path.join(os.path.dirname(os.path.realpath(__file__)), os.pardir, os.pardir, os.pardir)
@@ -136,11 +136,12 @@ def _check_missing_guide_references(operator_names, python_module_paths) -> List
                 continue
 
             docstring = ast.get_docstring(class_def)
-            if "This class is deprecated." in docstring:
-                continue
+            if docstring:
+                if "This class is deprecated." in docstring:
+                    continue
 
-            if f":ref:`howto/operator:{existing_operator}`" in ast.get_docstring(class_def):
-                continue
+                if f":ref:`howto/operator:{existing_operator}`" in docstring:
+                    continue
 
             build_errors.append(
                 _generate_missing_guide_error(py_module_path, class_def.lineno, existing_operator)
@@ -195,7 +196,7 @@ def _extract_file_content(file_path: str, message: Optional[str], pattern: str, 
 
 def filter_file_list_by_pattern(file_paths: Iterable[str], pattern: str) -> List[str]:
     """
-    Filters file list to those tha content matches the pattern
+    Filters file list to those that content matches the pattern
     :param file_paths: file paths to check
     :param pattern: pattern to match
     :return: list of files matching the pattern
@@ -229,13 +230,13 @@ def find_modules(deprecated_only: bool = False) -> Set[str]:
 
 
 def check_exampleinclude_for_example_dags() -> List[DocBuildError]:
-    """Checks all exampleincludes for  example dags."""
-    all_docs_files = glob(f"${DOCS_DIR}/**/*.rst", recursive=True)
+    """Checks all exampleincludes for example dags."""
+    all_docs_files = glob(f"{DOCS_DIR}/**/*.rst", recursive=True)
     build_errors = []
     for doc_file in all_docs_files:
         build_error = assert_file_not_contains(
             file_path=doc_file,
-            pattern=r"literalinclude::.+example_dags",
+            pattern=r"literalinclude::.+(?:example_dags|tests/system/)",
             message=(
                 "literalinclude directive is prohibited for example DAGs. \n"
                 "You should use the exampleinclude directive to include example DAGs."
@@ -264,19 +265,25 @@ def check_enforce_code_block() -> List[DocBuildError]:
     return build_errors
 
 
+def find_example_dags(provider_dir):
+    system_tests_dir = provider_dir.replace(f"{ROOT_PACKAGE_DIR}/", "")
+    yield from glob(f"{provider_dir}/**/*example_dags", recursive=True)
+    yield from glob(f"{ROOT_PROJECT_DIR}/tests/system/{system_tests_dir}/*/", recursive=True)
+
+
 def check_example_dags_in_provider_tocs() -> List[DocBuildError]:
     """Checks that each documentation for provider packages has a link to example DAGs in the TOC."""
     build_errors = []
 
     for provider in ALL_PROVIDER_YAMLS:
-        example_dags_dirs = list(glob(f"{provider['package-dir']}/**/example_dags", recursive=True))
+        example_dags_dirs = list(find_example_dags(provider['package-dir']))
         if not example_dags_dirs:
             continue
         doc_file_path = f"{DOCS_DIR}/{provider['package-name']}/index.rst"
 
         if len(example_dags_dirs) == 1:
             package_rel_path = os.path.relpath(example_dags_dirs[0], start=ROOT_PROJECT_DIR)
-            github_url = f"https://github.com/apache/airflow/tree/master/{package_rel_path}"
+            github_url = f"https://github.com/apache/airflow/tree/main/{package_rel_path}"
             expected_text = f"Example DAGs <{github_url}>"
         else:
             expected_text = "Example DAGs <example-dags>"

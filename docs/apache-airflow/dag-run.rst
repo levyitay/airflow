@@ -18,6 +18,30 @@
 DAG Runs
 =========
 A DAG Run is an object representing an instantiation of the DAG in time.
+Any time the DAG is executed, a DAG Run is created and all tasks inside it are executed. The status of the DAG Run depends on the tasks states.
+Each DAG Run is run separately from another, meaning that you can have running DAG many times at the same time.
+
+.. _dag-run:dag-run-status:
+
+DAG Run Status
+''''''''''''''
+
+A DAG Run status is determined when the execution of the DAG is finished.
+The execution of the DAG depends on its containing tasks and their dependencies.
+The status is assigned to the DAG Run when all of the tasks are in the one of the terminal states (i.e. if there is no possible transition to another state) like ``success``, ``failed`` or ``skipped``.
+The DAG Run is having the status assigned based on the so-called "leaf nodes" or simply "leaves". Leaf nodes are the tasks with no children.
+
+There are two possible terminal states for the DAG Run:
+
+- ``success`` if all of the leaf nodes states are either ``success`` or ``skipped``,
+- ``failed`` if any of the leaf nodes state is either ``failed`` or ``upstream_failed``.
+
+.. note::
+    Be careful if some of your tasks have defined some specific `trigger rule <dags.html#trigger-rules>`_.
+    These can lead to some unexpected behavior, e.g. if you have a leaf task with trigger rule `"all_done"`, it will be executed regardless of the states of the rest of the tasks and if it will succeed, then the whole DAG Run will also be marked as ``success``, even if something failed in the middle.
+
+Cron Presets
+''''''''''''
 
 Each DAG may or may not have a schedule, which informs how DAG Runs are
 created. ``schedule_interval`` is defined as a DAG argument, which can be passed a
@@ -26,9 +50,6 @@ a ``str``, a ``datetime.timedelta`` object, or one of the following cron "preset
 
 .. tip::
     You can use an online editor for CRON expressions such as `Crontab guru <https://crontab.guru/>`_
-
-Cron Presets
-''''''''''''
 
 +----------------+----------------------------------------------------------------+-----------------+
 | preset         | meaning                                                        | cron            |
@@ -54,17 +75,38 @@ Cron Presets
 Your DAG will be instantiated for each schedule along with a corresponding
 DAG Run entry in the database backend.
 
-.. note::
 
-    If you run a DAG on a schedule_interval of one day, the run stamped 2020-01-01
-    will be triggered soon after 2020-01-01T23:59. In other words, the job instance is
-    started once the period it covers has ended.  The ``execution_date`` available in the context
-    will also be 2020-01-01.
+.. _data-interval:
 
-    The first DAG Run is created based on the minimum ``start_date`` for the tasks in your DAG.
-    Subsequent DAG Runs are created by the scheduler process, based on your DAG’s ``schedule_interval``,
-    sequentially. If your start_date is 2020-01-01 and schedule_interval is @daily, the first run
-    will be created on 2020-01-02 i.e., after your start date has passed.
+Data Interval
+-------------
+
+Each DAG run in Airflow has an assigned "data interval" that represents the time
+range it operates in. For a DAG scheduled with ``@daily``, for example, each of
+its data interval would start at midnight of each day and end at midnight of the
+next day.
+
+A DAG run is usually scheduled *after* its associated data interval has ended,
+to ensure the run is able to collect all the data within the time period. In
+other words, a run covering the data period of 2020-01-01 generally does not
+start to run until 2020-01-01 has ended, i.e. after 2020-01-02 00:00:00.
+
+All dates in Airflow are tied to the data interval concept in some way. The
+"logical date" (also called ``execution_date`` in Airflow versions prior to 2.2)
+of a DAG run, for example, denotes the start of the data interval, not when the
+DAG is actually executed.
+
+Similarly, since the ``start_date`` argument for the DAG and its tasks points to
+the same logical date, it marks the start of *the DAG's first data interval*, not
+when tasks in the DAG will start running. In other words, a DAG run will only be
+scheduled one interval after ``start_date``.
+
+.. tip::
+
+    If ``schedule_interval`` is not enough to express your DAG's schedule,
+    logical date, or data interval, see :doc:`/concepts/timetable`.
+    For more information on ``logical date``, see :ref:`concepts:dag-run` and
+    :ref:`faq:what-does-execution-date-mean`
 
 Re-run DAG
 ''''''''''
@@ -78,7 +120,7 @@ Catchup
 
 An Airflow DAG with a ``start_date``, possibly an ``end_date``, and a ``schedule_interval`` defines a
 series of intervals which the scheduler turns into individual DAG Runs and executes. The scheduler, by default, will
-kick off a DAG Run for any interval that has not been run since the last execution date (or has been cleared). This concept is called Catchup.
+kick off a DAG Run for any data interval that has not been run since the last data interval (or has been cleared). This concept is called Catchup.
 
 If your DAG is not written to handle its catchup (i.e., not limited to the interval, but instead to ``Now`` for instance.),
 then you will want to turn catchup off. This can be done by setting ``catchup = False`` in DAG  or ``catchup_by_default = False``
@@ -88,34 +130,32 @@ in the configuration file. When turned off, the scheduler creates a DAG run only
 
     """
     Code that goes along with the Airflow tutorial located at:
-    https://github.com/apache/airflow/blob/master/airflow/example_dags/tutorial.py
+    https://github.com/apache/airflow/blob/main/airflow/example_dags/tutorial.py
     """
     from airflow.models.dag import DAG
     from airflow.operators.bash import BashOperator
-    from datetime import datetime, timedelta
 
-
-    default_args = {
-        'owner': 'airflow',
-        'depends_on_past': False,
-        'email': ['airflow@example.com'],
-        'email_on_failure': False,
-        'email_on_retry': False,
-        'retries': 1,
-        'retry_delay': timedelta(minutes=5)
-    }
+    import datetime
+    import pendulum
 
     dag = DAG(
-        'tutorial',
-        default_args=default_args,
-        start_date=datetime(2015, 12, 1),
-        description='A simple tutorial DAG',
-        schedule_interval='@daily',
-        catchup=False)
+        "tutorial",
+        default_args={
+            "depends_on_past": True,
+            "retries": 1,
+            "retry_delay": datetime.timedelta(minutes=3),
+        },
+        start_date=pendulum.datetime(2015, 12, 1, tz="UTC"),
+        description="A simple tutorial DAG",
+        schedule_interval="@daily",
+        catchup=False,
+    )
 
-In the example above, if the DAG is picked up by the scheduler daemon on 2016-01-02 at 6 AM,
-(or from the command line), a single DAG Run will be created, with an `execution_date` of 2016-01-01,
-and the next one will be created just after midnight on the morning of 2016-01-03 with an execution date of 2016-01-02.
+In the example above, if the DAG is picked up by the scheduler daemon on
+2016-01-02 at 6 AM, (or from the command line), a single DAG Run will be created
+with a data between 2016-01-01 and 2016-01-02, and the next one will be created
+just after midnight on the morning of 2016-01-03 with a data interval between
+2016-01-02 and 2016-01-03.
 
 If the ``dag.catchup`` value had been ``True`` instead, the scheduler would have created a DAG Run
 for each completed interval between 2015-12-01 and 2016-01-02 (but not yet one for 2016-01-02,
@@ -129,7 +169,7 @@ if your DAG performs catchup internally.
 
 Backfill
 ---------
-There can be the case when you may want to run the dag for a specified historical period e.g.,
+There can be the case when you may want to run the DAG for a specified historical period e.g.,
 A data filling DAG is created with ``start_date`` **2019-11-21**, but another user requires the output data from a month ago i.e., **2019-10-21**.
 This process is known as Backfill.
 
@@ -157,12 +197,12 @@ The executor will re-run it.
 
 There are multiple options you can select to re-run -
 
-* **Past** - All the instances of the task in the  runs before the current DAG's execution date
-* **Future** -  All the instances of the task in the  runs after the current DAG's execution date
+* **Past** - All the instances of the task in the runs before the DAG's most recent data interval
+* **Future** -  All the instances of the task in the runs after the DAG's most recent data interval
 * **Upstream** - The upstream tasks in the current DAG
 * **Downstream** - The downstream tasks in the current DAG
 * **Recursive** - All the tasks in the child DAGs and parent DAGs
-* **Failed** - Only the failed tasks in the current DAG
+* **Failed** - Only the failed tasks in the DAG's most recent run
 
 You can also clear the task through CLI using the command:
 
@@ -187,10 +227,10 @@ Note that DAG Runs can also be created manually through the CLI. Just run the
 
 .. code-block:: bash
 
-    airflow dags trigger --exec-date execution_date run_id
+    airflow dags trigger --exec-date logical_date run_id
 
 The DAG Runs created externally to the scheduler get associated with the trigger’s timestamp and are displayed
-in the UI alongside scheduled DAG runs. The execution date passed inside the DAG can be specified using the ``-e`` argument.
+in the UI alongside scheduled DAG runs. The logical date passed inside the DAG can be specified using the ``-e`` argument.
 The default is the current date in the UTC timezone.
 
 In addition, you can also manually trigger a DAG Run using the web UI (tab **DAGs** -> column **Links** -> button **Trigger Dag**)
@@ -207,14 +247,20 @@ Example of a parameterized DAG:
 
 .. code-block:: python
 
+    import pendulum
+
     from airflow import DAG
     from airflow.operators.bash import BashOperator
-    from airflow.utils.dates import days_ago
 
-    dag = DAG("example_parameterized_dag", schedule_interval=None, start_date=days_ago(2))
+    dag = DAG(
+        "example_parameterized_dag",
+        schedule_interval=None,
+        start_date=pendulum.datetime(2021, 1, 1, tz="UTC"),
+        catchup=False,
+    )
 
     parameterized_task = BashOperator(
-        task_id='parameterized_task',
+        task_id="parameterized_task",
         bash_command="echo value: {{ dag_run.conf['conf1'] }}",
         dag=dag,
     )

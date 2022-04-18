@@ -16,18 +16,23 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-/* global $, moment, Airflow, window, localStorage, document */
+/* global $, moment, Airflow, window, localStorage, document, hostName, csrfToken, Event */
 
 import {
   dateTimeAttrFormat,
   formatTimezone,
   isoDateToTimeEl,
   setDisplayedTimezone,
+  TimezoneEvent,
 } from './datetime_utils';
 
 window.isoDateToTimeEl = isoDateToTimeEl;
 
-// We pull moment in via a webpack entrypoint rather than import so that we don't put it in more than a single .js file. This "exports" it to be globally available.
+/*
+ We pull moment in via a webpack entrypoint rather than import
+ so that we don't put it in more than a single .js file.
+ This "exports" it to be globally available.
+*/
 window.moment = Airflow.moment;
 
 function displayTime() {
@@ -37,8 +42,15 @@ function displayTime() {
     .html(`${now.format('HH:mm')} <strong>${formatTimezone(now)}</strong>`);
 }
 
-function changDisplayedTimezone(tz) {
+function changeDisplayedTimezone(tz) {
   localStorage.setItem('selected-timezone', tz);
+
+  // dispatch an event that React can listen for
+  const event = new Event(TimezoneEvent);
+  event.value = tz;
+  event.key = 'selected-timezone';
+  document.dispatchEvent(event);
+
   setDisplayedTimezone(tz);
   displayTime();
   $('body').trigger({
@@ -47,7 +59,7 @@ function changDisplayedTimezone(tz) {
   });
 }
 
-var el = document.createElement('span');
+const el = document.createElement('span');
 
 export function escapeHtml(text) {
   el.textContent = text;
@@ -57,33 +69,33 @@ export function escapeHtml(text) {
 window.escapeHtml = escapeHtml;
 
 export function convertSecsToHumanReadable(seconds) {
-  var oriSeconds = seconds;
-  var floatingPart = oriSeconds- Math.floor(oriSeconds);
+  const oriSeconds = seconds;
+  const floatingPart = oriSeconds - Math.floor(oriSeconds);
 
   seconds = Math.floor(seconds);
 
-  var secondsPerHour = 60 * 60;
-  var secondsPerMinute = 60;
+  const secondsPerHour = 60 * 60;
+  const secondsPerMinute = 60;
 
-  var hours = Math.floor(seconds / secondsPerHour);
-  seconds = seconds - hours * secondsPerHour;
+  const hours = Math.floor(seconds / secondsPerHour);
+  seconds -= hours * secondsPerHour;
 
-  var minutes = Math.floor(seconds / secondsPerMinute);
-  seconds = seconds - minutes * secondsPerMinute;
+  const minutes = Math.floor(seconds / secondsPerMinute);
+  seconds -= minutes * secondsPerMinute;
 
-  var readableFormat = '';
+  let readableFormat = '';
   if (hours > 0) {
-    readableFormat += hours + 'Hours ';
+    readableFormat += `${hours}Hours `;
   }
   if (minutes > 0) {
-    readableFormat += minutes + 'Min ';
+    readableFormat += `${minutes}Min `;
   }
   if (seconds + floatingPart > 0) {
     if (Math.floor(oriSeconds) === oriSeconds) {
-      readableFormat += seconds + 'Sec';
+      readableFormat += `${seconds}Sec`;
     } else {
       seconds += floatingPart;
-      readableFormat += seconds.toFixed(3) + 'Sec';
+      readableFormat += `${seconds.toFixed(3)}Sec`;
     }
   }
   return readableFormat;
@@ -91,13 +103,13 @@ export function convertSecsToHumanReadable(seconds) {
 window.convertSecsToHumanReadable = convertSecsToHumanReadable;
 
 function postAsForm(url, parameters) {
-  var form = $('<form></form>');
+  const form = $('<form></form>');
 
   form.attr('method', 'POST');
   form.attr('action', url);
 
-  $.each(parameters || {}, function(key, value) {
-    var field = $('<input></input>');
+  $.each(parameters || {}, (key, value) => {
+    const field = $('<input></input>');
 
     field.attr('type', 'hidden');
     field.attr('name', key);
@@ -106,7 +118,7 @@ function postAsForm(url, parameters) {
     form.append(field);
   });
 
-  var field = $('<input></input>');
+  const field = $('<input></input>');
 
   field.attr('type', 'hidden');
   field.attr('name', 'csrf_token');
@@ -130,7 +142,7 @@ function initializeUITimezone() {
 
   function setManualTimezone(tz) {
     localStorage.setItem('chosen-timezone', tz);
-    if (tz == local && tz == Airflow.serverTimezone) {
+    if (tz === local && tz === Airflow.serverTimezone) {
       $('#timezone-manual').hide();
       return;
     }
@@ -143,7 +155,7 @@ function initializeUITimezone() {
     setManualTimezone(manualTz);
   }
 
-  changDisplayedTimezone(selectedTz || Airflow.defaultUITimezone);
+  changeDisplayedTimezone(selectedTz || Airflow.defaultUITimezone);
 
   if (Airflow.serverTimezone !== 'UTC') {
     $('#timezone-server a').html(`${formatTimezone(Airflow.serverTimezone)} <span class="label label-primary">Server</span>`);
@@ -159,7 +171,7 @@ function initializeUITimezone() {
   }
 
   $('a[data-timezone]').click((evt) => {
-    changDisplayedTimezone($(evt.target).data('timezone'));
+    changeDisplayedTimezone($(evt.currentTarget).data('timezone'));
   });
 
   $('#timezone-other').typeahead({
@@ -175,7 +187,7 @@ function initializeUITimezone() {
       this.$element.val('');
 
       setManualTimezone(data.tzName);
-      changDisplayedTimezone(data.tzName);
+      changeDisplayedTimezone(data.tzName);
 
       // We need to delay the close event to not be in the form handler,
       // otherwise bootstrap ignores it, thinking it's caused by interaction on
@@ -203,11 +215,11 @@ $(document).ready(() => {
   setInterval(displayTime, 1000);
 
   $.ajaxSetup({
-    beforeSend: function(xhr, settings) {
+    beforeSend(xhr, settings) {
       if (!/^(GET|HEAD|OPTIONS|TRACE)$/i.test(settings.type) && !this.crossDomain) {
-        xhr.setRequestHeader("X-CSRFToken", csrfToken);
+        xhr.setRequestHeader('X-CSRFToken', csrfToken);
       }
-    }
+    },
   });
 
   $.fn.datetimepicker.defaults.format = 'YYYY-MM-DD HH:mm:ssZ';

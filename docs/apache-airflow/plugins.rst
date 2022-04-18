@@ -27,7 +27,7 @@ features to its core by simply dropping files in your
 The python modules in the ``plugins`` folder get imported, and **macros** and web **views**
 get integrated to Airflow's main collections and become available for use.
 
-To troubleshoot issue with plugins, you can use ``airflow plugins`` command.
+To troubleshoot issues with plugins, you can use the ``airflow plugins`` command.
 This command dumps information about loaded plugins.
 
 .. versionchanged:: 2.0
@@ -93,6 +93,8 @@ config setting to True, resulting in launching a whole new python interpreter fo
 (Modules only imported by DAG files on the other hand do not suffer this problem, as DAG files are not
 loaded/parsed in any long-running Airflow process.)
 
+.. _plugins:interface:
+
 Interface
 ---------
 
@@ -122,8 +124,8 @@ looks like:
         #   to protect against extra parameters injected into the on_load(...)
         #   function in future changes
         def on_load(*args, **kwargs):
-           # ... perform Plugin boot actions
-           pass
+            # ... perform Plugin boot actions
+            pass
 
         # A list of global operator extra links that can redirect users to
         # external systems. These extra links will be available on the
@@ -133,12 +135,19 @@ looks like:
         # operator level.
         global_operator_extra_links = []
 
-
         # A list of operator extra links to override or add operator links
         # to existing Airflow Operators.
         # These extra links will be available on the task page in form of
         # buttons.
         operator_extra_links = []
+
+        # A list of timetable classes to register so they can be used in DAGs.
+        timetables = []
+
+        # A list of Listeners that plugin provides. Listeners can register to
+        # listen to particular events that happen in Airflow, like
+        # TaskInstance state changes. Listeners are python modules.
+        listeners = []
 
 You can derive it by inheritance (please refer to the example below). In the example, all options have been
 defined as class attributes, but you can also define them as properties if you need to perform
@@ -165,24 +174,27 @@ definitions in Airflow.
 
     # Importing base classes that we need to derive
     from airflow.hooks.base import BaseHook
-    from airflow.models.baseoperator import BaseOperatorLink
     from airflow.providers.amazon.aws.transfers.gcs_to_s3 import GCSToS3Operator
 
     # Will show up in Connections screen in a future version
     class PluginHook(BaseHook):
         pass
 
+
     # Will show up under airflow.macros.test_plugin.plugin_macro
     # and in templates through {{ macros.test_plugin.plugin_macro }}
     def plugin_macro():
         pass
 
+
     # Creating a flask blueprint to integrate the templates and static folder
     bp = Blueprint(
-        "test_plugin", __name__,
-        template_folder='templates', # registers airflow/plugins/templates as a Jinja template folder
-        static_folder='static',
-        static_url_path='/static/test_plugin')
+        "test_plugin",
+        __name__,
+        template_folder="templates",  # registers airflow/plugins/templates as a Jinja template folder
+        static_folder="static",
+        static_url_path="/static/test_plugin",
+    )
 
     # Creating a flask appbuilder BaseView
     class TestAppBuilderBaseView(AppBuilderBaseView):
@@ -192,6 +204,7 @@ definitions in Airflow.
         def test(self):
             return self.render_template("test_plugin/test.html", content="Hello galaxy!")
 
+
     # Creating a flask appbuilder BaseView
     class TestAppBuilderBaseNoMenuView(AppBuilderBaseView):
         default_view = "test"
@@ -200,15 +213,16 @@ definitions in Airflow.
         def test(self):
             return self.render_template("test_plugin/test.html", content="Hello galaxy!")
 
+
     v_appbuilder_view = TestAppBuilderBaseView()
-    v_appbuilder_package = {"name": "Test View",
-                            "category": "Test Plugin",
-                            "view": v_appbuilder_view}
+    v_appbuilder_package = {
+        "name": "Test View",
+        "category": "Test Plugin",
+        "view": v_appbuilder_view,
+    }
 
     v_appbuilder_nomenu_view = TestAppBuilderBaseNoMenuView()
-    v_appbuilder_nomenu_package = {
-        "view": v_appbuilder_nomenu_view
-    }
+    v_appbuilder_nomenu_package = {"view": v_appbuilder_nomenu_view}
 
     # Creating flask appbuilder Menu Items
     appbuilder_mitem = {
@@ -221,29 +235,6 @@ definitions in Airflow.
         "href": "https://www.apache.org/",
     }
 
-    # A global operator extra link that redirect you to
-    # task logs stored in S3
-    class GoogleLink(BaseOperatorLink):
-        name = "Google"
-
-        def get_link(self, operator, dttm):
-            return "https://www.google.com"
-
-    # A list of operator extra links to override or add operator links
-    # to existing Airflow Operators.
-    # These extra links will be available on the task page in form of
-    # buttons.
-    class S3LogLink(BaseOperatorLink):
-        name = 'S3'
-        operators = [GCSToS3Operator]
-
-        def get_link(self, operator, dttm):
-            return 'https://s3.amazonaws.com/airflow-logs/{dag_id}/{task_id}/{execution_date}'.format(
-                dag_id=operator.dag_id,
-                task_id=operator.task_id,
-                execution_date=dttm,
-            )
-
 
     # Defining the plugin class
     class AirflowTestPlugin(AirflowPlugin):
@@ -253,19 +244,8 @@ definitions in Airflow.
         flask_blueprints = [bp]
         appbuilder_views = [v_appbuilder_package, v_appbuilder_nomenu_package]
         appbuilder_menu_items = [appbuilder_mitem, appbuilder_mitem_toplevel]
-        global_operator_extra_links = [GoogleLink(),]
-        operator_extra_links = [S3LogLink(), ]
 
-
-Note on role based views
-------------------------
-
-Airflow 1.10 introduced role based views using FlaskAppBuilder. You can configure which UI is used by setting
-``rbac = True``. To support plugin views and links for both versions of the UI and maintain backwards compatibility,
-the fields ``appbuilder_views`` and ``appbuilder_menu_items`` were added to the ``AirflowTestPlugin`` class.
-
-``appbuilder_views`` supports both views-with-menu and views-without-menu - to add a view with menu link, add a "name"
-key in view's package dictionary, otherwise the view is added to flask appbuilder without menu item.
+.. seealso:: :doc:`/howto/define_extra_link`
 
 Exclude views from CSRF protection
 ----------------------------------
@@ -277,16 +257,17 @@ some views using a decorator.
 
     from airflow.www.app import csrf
 
+
     @csrf.exempt
     def my_handler():
         # ...
-        return 'ok'
+        return "ok"
 
 Plugins as Python packages
 --------------------------
 
 It is possible to load plugins via `setuptools entrypoint <https://packaging.python.org/guides/creating-and-discovering-plugins/#using-package-metadata>`_ mechanism. To do this link
-your plugin using an entrypoint in your package. If the package is installed, airflow
+your plugin using an entrypoint in your package. If the package is installed, Airflow
 will automatically load the registered plugins from the entrypoint list.
 
 .. note::
@@ -302,14 +283,17 @@ will automatically load the registered plugins from the entrypoint list.
 
     # Creating a flask blueprint to integrate the templates and static folder
     bp = Blueprint(
-        "test_plugin", __name__,
-        template_folder='templates', # registers airflow/plugins/templates as a Jinja template folder
-        static_folder='static',
-        static_url_path='/static/test_plugin')
+        "test_plugin",
+        __name__,
+        template_folder="templates",  # registers airflow/plugins/templates as a Jinja template folder
+        static_folder="static",
+        static_url_path="/static/test_plugin",
+    )
+
 
     class MyAirflowPlugin(AirflowPlugin):
-      name = 'my_namespace'
-      flask_blueprints = [bp]
+        name = "my_namespace"
+        flask_blueprints = [bp]
 
 .. code-block:: python
 
@@ -317,12 +301,10 @@ will automatically load the registered plugins from the entrypoint list.
 
     setup(
         name="my-package",
-        ...
-        entry_points = {
-            'airflow.plugins': [
-                'my_plugin = my_package.my_plugin:MyAirflowPlugin'
-            ]
-        }
+        # ...
+        entry_points={
+            "airflow.plugins": ["my_plugin = my_package.my_plugin:MyAirflowPlugin"]
+        },
     )
 
 Automatic reloading webserver

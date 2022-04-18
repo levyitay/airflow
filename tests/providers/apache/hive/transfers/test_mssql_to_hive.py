@@ -15,11 +15,13 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
-# pylint: disable=no-member
+
 
 import unittest
 from collections import OrderedDict
 from unittest.mock import Mock, PropertyMock, patch
+
+import pytest
 
 from airflow import PY38
 
@@ -34,26 +36,26 @@ except ImportError:
     pymssql = None
 
 
-@unittest.skipIf(PY38, "Mssql package not available when Python >= 3.8.")
-@unittest.skipIf(pymssql is None, 'pymssql package not present')
+@pytest.mark.skipif(PY38, reason="Mssql package not available when Python >= 3.8.")
+@pytest.mark.skipif(pymssql is None, reason='pymssql package not present')
 class TestMsSqlToHiveTransfer(unittest.TestCase):
     def setUp(self):
         self.kwargs = dict(sql='sql', hive_table='table', task_id='test_mssql_to_hive', dag=None)
 
     def test_type_map_binary(self):
-        # pylint: disable=c-extension-no-member, no-member
+
         mapped_type = MsSqlToHiveOperator(**self.kwargs).type_map(pymssql.BINARY.value)
 
         assert mapped_type == 'INT'
 
     def test_type_map_decimal(self):
-        # pylint: disable=c-extension-no-member, no-member
+
         mapped_type = MsSqlToHiveOperator(**self.kwargs).type_map(pymssql.DECIMAL.value)
 
         assert mapped_type == 'FLOAT'
 
     def test_type_map_number(self):
-        # pylint: disable=c-extension-no-member, no-member
+
         mapped_type = MsSqlToHiveOperator(**self.kwargs).type_map(pymssql.NUMBER.value)
 
         assert mapped_type == 'INT'

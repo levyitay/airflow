@@ -36,7 +36,7 @@ For example:
 
 .. code-block:: python
 
-   dag = DAG('dag', tags=['team1', 'sql'])
+   dag = DAG("dag", tags=["team1", "sql"])
 
 
 ------------
@@ -46,24 +46,39 @@ For example:
 ------------
 
 
-Tree View
+Grid View
 .........
-A tree representation of the DAG that spans across time. If a pipeline is
-late, you can quickly see where the different steps are and identify
+A bar chart and grid representation of the DAG that spans across time.
+The top row is a chart of DAG Runs by duration,
+and below, task instances. If a pipeline is late,
+you can quickly see where the different steps are and identify
 the blocking ones.
-
-There is also visual difference between scheduled and manually triggered
-DAGs/tasks:
-
-.. image:: img/task_manual_vs_scheduled.png
-
-The DAGs/tasks with a black border are scheduled runs, whereas the non-bordered
-DAGs/tasks are manually triggered, i.e. by ``airflow dags trigger``.
-
 
 ------------
 
-.. image:: img/tree.png
+.. image:: img/grid.png
+
+------------
+
+The details panel will update when selecting a DAG Run by clicking on a duration bar:
+
+.. image:: img/grid_run_details.png
+
+Or selecting a Task Instance by clicking on a status box:
+
+.. image:: img/grid_instance_details.png
+
+Manual runs are indicated by a play icon (just like the Trigger DAG button):
+
+.. image:: img/task_manual_vs_scheduled.png
+
+Task groups are indicated by a caret and can be opened or closed:
+
+.. image:: img/grid_task_group.png
+
+Mapped Tasks are indicated by a square brackets and will show a table of each mapped task instance in the details panel:
+
+.. image:: img/grid_mapped_task.png
 
 ------------
 
@@ -78,6 +93,17 @@ dependencies and their current status for a specific run.
 ------------
 
 .. image:: img/graph.png
+
+------------
+
+Calendar View
+.............
+The calendar view gives you an overview of your entire DAG's history over months, or even years.
+Letting you quickly see trends of the overall success/failure rate of runs over time.
+
+------------
+
+.. image:: img/calendar.png
 
 ------------
 

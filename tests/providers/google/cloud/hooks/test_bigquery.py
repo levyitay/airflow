@@ -15,7 +15,7 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
-# pylint: disable=not-callable
+
 
 import re
 import unittest
@@ -54,8 +54,8 @@ TABLE_REFERENCE_REPR = {
 TABLE_REFERENCE = TableReference.from_api_repr(TABLE_REFERENCE_REPR)
 
 
-class _BigQueryBaseTestClass(unittest.TestCase):
-    def setUp(self) -> None:
+class _BigQueryBaseTestClass:
+    def setup_method(self) -> None:
         class MockedBigQueryHook(BigQueryHook):
             def _get_credentials_and_project_id(self):
                 return CREDENTIALS, PROJECT_ID
@@ -172,7 +172,7 @@ class TestBigQueryHookMethods(_BigQueryBaseTestClass):
         with pytest.raises(
             Exception,
             match=(
-                r"\['THIS IS NOT VALID'\] contains invalid schema update options."
+                r"\['THIS IS NOT VALID'\] contains invalid schema update options. "
                 r"Please only use one or more of the following options: "
                 r"\['ALLOW_FIELD_ADDITION', 'ALLOW_FIELD_RELAXATION'\]"
             ),
@@ -212,7 +212,8 @@ class TestBigQueryHookMethods(_BigQueryBaseTestClass):
         self.hook.running_job_id = running_job_id
         self.hook.cancel_query()
 
-        mock_poll_job_complete.has_calls(mock.call(running_job_id), mock.call(running_job_id))
+        calls = [mock.call(job_id=running_job_id), mock.call(running_job_id)]
+        mock_poll_job_complete.assert_has_calls(calls)
         mock_client.assert_called_once_with(project_id=PROJECT_ID, location=None)
         mock_client.return_value.cancel_job.assert_called_once_with(job_id=running_job_id)
 
@@ -461,7 +462,7 @@ class TestBigQueryHookMethods(_BigQueryBaseTestClass):
             location=LOCATION,
         )
         mock_table.from_api_repr.assert_called_once_with({"tableReference": TABLE_REFERENCE_REPR})
-        mock_schema.has_calls([mock.call(x, "") for x in ["field_1", "field_2"]])
+        mock_schema.assert_has_calls([mock.call(x, "") for x in ["field_1", "field_2"]])
         mock_client.return_value.list_rows.assert_called_once_with(
             table=mock_table.from_api_repr.return_value,
             max_results=10,
@@ -898,9 +899,10 @@ class TestBigQueryHookMethods(_BigQueryBaseTestClass):
         _, kwargs = mock_insert.call_args
         assert kwargs["configuration"]['labels'] == {'label1': 'test1', 'label2': 'test2'}
 
+    @pytest.mark.parametrize('nowait', [True, False])
     @mock.patch("airflow.providers.google.cloud.hooks.bigquery.QueryJob")
     @mock.patch("airflow.providers.google.cloud.hooks.bigquery.BigQueryHook.get_client")
-    def test_insert_job(self, mock_client, mock_query_job):
+    def test_insert_job(self, mock_client, mock_query_job, nowait):
         job_conf = {
             "query": {
                 "query": "SELECT * FROM test",
@@ -910,10 +912,7 @@ class TestBigQueryHookMethods(_BigQueryBaseTestClass):
         mock_query_job._JOB_TYPE = "query"
 
         self.hook.insert_job(
-            configuration=job_conf,
-            job_id=JOB_ID,
-            project_id=PROJECT_ID,
-            location=LOCATION,
+            configuration=job_conf, job_id=JOB_ID, project_id=PROJECT_ID, location=LOCATION, nowait=nowait
         )
 
         mock_client.assert_called_once_with(
@@ -928,7 +927,25 @@ class TestBigQueryHookMethods(_BigQueryBaseTestClass):
             },
             mock_client.return_value,
         )
-        mock_query_job.from_api_repr.return_value.result.assert_called_once_with()
+        if nowait:
+            mock_query_job.from_api_repr.return_value._begin.assert_called_once()
+            mock_query_job.from_api_repr.return_value.result.assert_not_called()
+        else:
+            mock_query_job.from_api_repr.return_value._begin.assert_not_called()
+            mock_query_job.from_api_repr.return_value.result.assert_called_once()
+
+    def test_dbapi_get_uri(self):
+        assert self.hook.get_uri().startswith('bigquery://')
+
+    def test_dbapi_get_sqlalchemy_engine_failed(self):
+        with pytest.raises(
+            AirflowException,
+            match="For now, we only support instantiating SQLAlchemy engine by"
+            " using ADC"
+            ", extra__google_cloud_platform__key_path"
+            "and extra__google_cloud_platform__keyfile_dict",
+        ):
+            self.hook.get_sqlalchemy_engine()
 
 
 class TestBigQueryTableSplitter(unittest.TestCase):
@@ -1200,29 +1217,31 @@ class TestBigQueryCursor(_BigQueryBaseTestClass):
         bq_cursor = self.hook.get_cursor()
         bq_cursor.executemany("SELECT %(foo)s", [{"foo": "bar"}, {"foo": "baz"}])
         assert mock_insert.call_count == 2
-        assert mock_insert.has_calls(
-            mock.call(
-                configuration={
-                    'query': {
-                        'query': "SELECT 'bar'",
-                        'priority': 'INTERACTIVE',
-                        'useLegacySql': True,
-                        'schemaUpdateOptions': [],
-                    }
-                },
-                project_id=PROJECT_ID,
-            ),
-            mock.call(
-                configuration={
-                    'query': {
-                        'query': "SELECT 'baz'",
-                        'priority': 'INTERACTIVE',
-                        'useLegacySql': True,
-                        'schemaUpdateOptions': [],
-                    }
-                },
-                project_id=PROJECT_ID,
-            ),
+        mock_insert.assert_has_calls(
+            [
+                mock.call(
+                    configuration={
+                        'query': {
+                            'query': "SELECT 'bar'",
+                            'priority': 'INTERACTIVE',
+                            'useLegacySql': True,
+                            'schemaUpdateOptions': [],
+                        }
+                    },
+                    project_id=PROJECT_ID,
+                ),
+                mock.call(
+                    configuration={
+                        'query': {
+                            'query': "SELECT 'baz'",
+                            'priority': 'INTERACTIVE',
+                            'useLegacySql': True,
+                            'schemaUpdateOptions': [],
+                        }
+                    },
+                    project_id=PROJECT_ID,
+                ),
+            ]
         )
 
     @mock.patch("airflow.providers.google.cloud.hooks.bigquery.BigQueryHook.get_service")
@@ -1234,7 +1253,7 @@ class TestBigQueryCursor(_BigQueryBaseTestClass):
     @mock.patch("airflow.providers.google.cloud.hooks.bigquery.BigQueryHook.get_service")
     def test_close(self, mock_get_service):
         bq_cursor = self.hook.get_cursor()
-        result = bq_cursor.close()  # pylint: disable=assignment-from-no-return
+        result = bq_cursor.close()
         assert result is None
 
     @mock.patch("airflow.providers.google.cloud.hooks.bigquery.BigQueryHook.get_service")
@@ -1745,7 +1764,6 @@ class TestBigQueryWithKMS(_BigQueryBaseTestClass):
             retry=DEFAULT_RETRY,
         )
 
-    # pylint: disable=too-many-locals
     @mock.patch("airflow.providers.google.cloud.hooks.bigquery.BigQueryHook.create_empty_table")
     def test_create_external_table_with_kms(self, mock_create):
         external_project_dataset_table = f"{PROJECT_ID}.{DATASET_ID}.{TABLE_ID}"
@@ -1762,7 +1780,15 @@ class TestBigQueryWithKMS(_BigQueryBaseTestClass):
         allow_jagged_rows = False
         encoding = "UTF-8"
         labels = {'label1': 'test1', 'label2': 'test2'}
-        schema_fields = [{'mode': 'REQUIRED', 'name': 'id', 'type': 'STRING', 'description': None}]
+        schema_fields = [
+            {
+                'mode': 'REQUIRED',
+                'name': 'id',
+                'type': 'STRING',
+                'description': None,
+                'policyTags': {'names': []},
+            }
+        ]
         encryption_configuration = {"kms_key_name": "projects/p/locations/l/keyRings/k/cryptoKeys/c"}
 
         self.hook.create_external_table(
@@ -1994,7 +2020,7 @@ class TestBigQueryWithLabelsAndDescription(_BigQueryBaseTestClass):
         )
 
         _, kwargs = mock_create.call_args
-        self.assertDictEqual(kwargs['table_resource']['labels'], labels)
+        assert kwargs['table_resource']['labels'] == labels
 
     @mock.patch("airflow.providers.google.cloud.hooks.bigquery.BigQueryHook.create_empty_table")
     def test_create_external_table_description(self, mock_create):

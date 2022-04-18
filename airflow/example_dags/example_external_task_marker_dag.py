@@ -37,17 +37,18 @@ interval till one of the following will happen:
     exception
 """
 
-import datetime
+import pendulum
 
 from airflow import DAG
-from airflow.operators.dummy import DummyOperator
+from airflow.operators.empty import EmptyOperator
 from airflow.sensors.external_task import ExternalTaskMarker, ExternalTaskSensor
 
-start_date = datetime.datetime(2015, 1, 1)
+start_date = pendulum.datetime(2021, 1, 1, tz="UTC")
 
 with DAG(
     dag_id="example_external_task_marker_parent",
     start_date=start_date,
+    catchup=False,
     schedule_interval=None,
     tags=['example2'],
 ) as parent_dag:
@@ -63,6 +64,7 @@ with DAG(
     dag_id="example_external_task_marker_child",
     start_date=start_date,
     schedule_interval=None,
+    catchup=False,
     tags=['example2'],
 ) as child_dag:
     # [START howto_operator_external_task_sensor]
@@ -76,5 +78,5 @@ with DAG(
         mode="reschedule",
     )
     # [END howto_operator_external_task_sensor]
-    child_task2 = DummyOperator(task_id="child_task2")
+    child_task2 = EmptyOperator(task_id="child_task2")
     child_task1 >> child_task2
