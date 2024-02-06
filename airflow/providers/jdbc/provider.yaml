@@ -21,7 +21,21 @@ name: Java Database Connectivity (JDBC)
 description: |
     `Java Database Connectivity (JDBC) <https://docs.oracle.com/javase/8/docs/technotes/guides/jdbc/>`__
 
+state: ready
+source-date-epoch: 1703288143
 versions:
+  - 4.2.1
+  - 4.2.0
+  - 4.1.0
+  - 4.0.2
+  - 4.0.1
+  - 4.0.0
+  - 3.4.0
+  - 3.3.0
+  - 3.2.1
+  - 3.2.0
+  - 3.1.0
+  - 3.0.0
   - 2.1.3
   - 2.1.2
   - 2.1.1
@@ -31,8 +45,10 @@ versions:
   - 1.0.1
   - 1.0.0
 
-additional-dependencies:
-  - apache-airflow>=2.1.0
+dependencies:
+  - apache-airflow>=2.6.0
+  - apache-airflow-providers-common-sql>=1.3.1
+  - jaydebeapi>=1.1.1
 
 integrations:
   - integration-name: Java Database Connectivity (JDBC)
@@ -51,9 +67,29 @@ hooks:
     python-modules:
       - airflow.providers.jdbc.hooks.jdbc
 
-hook-class-names:  # deprecated - to be removed after providers add dependency on Airflow 2.2.0+
-  - airflow.providers.jdbc.hooks.jdbc.JdbcHook
-
 connection-types:
   - hook-class-name: airflow.providers.jdbc.hooks.jdbc.JdbcHook
     connection-type: jdbc
+
+config:
+  providers.jdbc:
+    description: This section applies for the JDBC provider and connection type.
+    options:
+      allow_driver_path_in_extra:
+        description: |
+          Whether to allow using ``driver_path`` set in the connection's ``extra`` field. If set to False,
+          ``driver_path`` will be ignored. If enabling this functionality, you should make sure that you
+          trust the users who can edit connections to not use it maliciously.
+        version_added: "4.0.0"
+        type: boolean
+        example: ~
+        default: "False"
+      allow_driver_class_in_extra:
+        description: |
+          Whether to allow using ``driver_class`` set in the connection's ``extra`` field. If set to False,
+          ``driver_class`` will be ignored. If enabling this functionality, you should make sure that you
+          trust the users who can edit connections to not use it maliciously.
+        version_added: "4.0.0"
+        type: boolean
+        example: ~
+        default: "False"

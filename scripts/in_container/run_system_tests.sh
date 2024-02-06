@@ -17,7 +17,7 @@
 # under the License.
 
 #
-# Bash sanity settings (error on exit, complain for undefined vars, error when pipe fails)
+# Bash coherence settings (error on exit, complain for undefined vars, error when pipe fails)
 set -euo pipefail
 
 IN_CONTAINER_DIR=$(cd "$(dirname "$0")" || exit 1; pwd)
@@ -26,9 +26,7 @@ IN_CONTAINER_DIR=$(cd "$(dirname "$0")" || exit 1; pwd)
 . "${IN_CONTAINER_DIR}/_in_container_utils.sh"
 
 in_container_set_colors
-
-in_container_basic_sanity_check
-
+in_container_basic_check
 in_container_script_start
 
 # any argument received is overriding the default nose execution arguments:

@@ -19,17 +19,27 @@
 ========================================
 
 
-Content
--------
 
 .. toctree::
+    :hidden:
+    :maxdepth: 1
+    :caption: Basics
+
+    Home <self>
+    Changelog <changelog>
+    Security <security>
+
+.. toctree::
+    :hidden:
     :maxdepth: 1
     :caption: Guides
 
     Connection types <connections>
     Operators <operators/index>
+    Logging for Tasks <logging/index>
 
 .. toctree::
+    :hidden:
     :maxdepth: 1
     :caption: References
 
@@ -41,6 +51,7 @@ Content
 
 
 .. toctree::
+    :hidden:
     :maxdepth: 1
     :caption: Commits
 
@@ -54,7 +65,7 @@ Package apache-airflow-providers-apache-hdfs
 and `WebHDFS <https://hadoop.apache.org/docs/current/hadoop-project-dist/hadoop-hdfs/WebHDFS.html>`__.
 
 
-Release: 2.2.3
+Release: 4.4.0
 
 Provider package
 ----------------
@@ -65,18 +76,18 @@ are in ``airflow.providers.apache.hdfs`` python package.
 Installation
 ------------
 
-You can install this package on top of an existing Airflow 2.1+ installation via
+You can install this package on top of an existing Airflow 2 installation (see ``Requirements`` below)
+for the minimum Airflow version supported) via
 ``pip install apache-airflow-providers-apache-hdfs``
 
-PIP requirements
-----------------
+Requirements
+------------
+
+The minimum Apache Airflow version supported by this provider package is ``2.6.0``.
 
 =================================  ==================
 PIP package                        Version required
 =================================  ==================
-``apache-airflow``                 ``>=2.1.0``
+``apache-airflow``                 ``>=2.6.0``
 ``hdfs[avro,dataframe,kerberos]``  ``>=2.0.4``
-``snakebite-py3``
 =================================  ==================
-
-.. include:: ../../airflow/providers/apache/hdfs/CHANGELOG.rst

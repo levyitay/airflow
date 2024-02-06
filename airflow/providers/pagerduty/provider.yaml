@@ -21,7 +21,19 @@ name: Pagerduty
 description: |
     `Pagerduty <https://www.pagerduty.com/>`__
 
+state: ready
+source-date-epoch: 1705912210
 versions:
+  - 3.6.1
+  - 3.6.0
+  - 3.5.1
+  - 3.5.0
+  - 3.4.0
+  - 3.3.1
+  - 3.3.0
+  - 3.2.0
+  - 3.1.0
+  - 3.0.0
   - 2.1.3
   - 2.1.2
   - 2.1.1
@@ -31,8 +43,9 @@ versions:
   - 1.0.1
   - 1.0.0
 
-additional-dependencies:
-  - apache-airflow>=2.1.0
+dependencies:
+  - apache-airflow>=2.6.0
+  - pdpyras>=4.1.2
 
 integrations:
   - integration-name: Pagerduty
@@ -51,3 +64,6 @@ hooks:
     python-modules:
       - airflow.providers.pagerduty.hooks.pagerduty
       - airflow.providers.pagerduty.hooks.pagerduty_events
+
+notifications:
+  - airflow.providers.pagerduty.notifications.pagerduty.PagerdutyNotifier

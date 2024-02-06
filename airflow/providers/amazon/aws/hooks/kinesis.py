@@ -15,9 +15,9 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
+"""This module contains AWS Firehose hook."""
+from __future__ import annotations
 
-"""This module contains AWS Firehose hook"""
-import warnings
 from typing import Iterable
 
 from airflow.providers.amazon.aws.hooks.base_aws import AwsBaseHook
@@ -25,15 +25,17 @@ from airflow.providers.amazon.aws.hooks.base_aws import AwsBaseHook
 
 class FirehoseHook(AwsBaseHook):
     """
-    Interact with AWS Kinesis Firehose.
+    Interact with Amazon Kinesis Firehose.
+
+    Provide thick wrapper around :external+boto3:py:class:`boto3.client("firehose") <Firehose.Client>`.
+
+    :param delivery_stream: Name of the delivery stream
 
     Additional arguments (such as ``aws_conn_id``) may be specified and
     are passed down to the underlying AwsBaseHook.
 
     .. seealso::
-        :class:`~airflow.providers.amazon.aws.hooks.base_aws.AwsBaseHook`
-
-    :param delivery_stream: Name of the delivery stream
+        - :class:`airflow.providers.amazon.aws.hooks.base_aws.AwsBaseHook`
     """
 
     def __init__(self, delivery_stream: str, *args, **kwargs) -> None:
@@ -42,23 +44,11 @@ class FirehoseHook(AwsBaseHook):
         super().__init__(*args, **kwargs)
 
     def put_records(self, records: Iterable):
-        """Write batch records to Kinesis Firehose"""
-        response = self.get_conn().put_record_batch(DeliveryStreamName=self.delivery_stream, Records=records)
+        """Write batch records to Kinesis Firehose.
 
-        return response
+        .. seealso::
+            - :external+boto3:py:meth:`Firehose.Client.put_record_batch`
 
-
-class AwsFirehoseHook(FirehoseHook):
-    """
-    This hook is deprecated.
-    Please use :class:`airflow.providers.amazon.aws.hooks.kinesis.FirehoseHook`.
-    """
-
-    def __init__(self, *args, **kwargs):
-        warnings.warn(
-            "This hook is deprecated. "
-            "Please use :class:`airflow.providers.amazon.aws.hooks.kinesis.FirehoseHook`.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        super().__init__(*args, **kwargs)
+        :param records: list of records
+        """
+        return self.get_conn().put_record_batch(DeliveryStreamName=self.delivery_stream, Records=records)

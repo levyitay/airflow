@@ -15,10 +15,11 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
-#
+from __future__ import annotations
 
-from unittest import TestCase, mock
+from unittest import mock
 
+import pytest
 from google.api_core.gapic_v1.method import DEFAULT
 
 from airflow.providers.google.cloud.hooks.vertex_ai.endpoint_service import EndpointServiceHook
@@ -31,6 +32,7 @@ TEST_GCP_CONN_ID: str = "test-gcp-conn-id"
 TEST_REGION: str = "test-region"
 TEST_PROJECT_ID: str = "test-project-id"
 TEST_ENDPOINT: dict = {}
+TEST_ENDPOINT_ID: str = "1234567890"
 TEST_ENDPOINT_NAME: str = "test_endpoint_name"
 TEST_DEPLOYED_MODEL: dict = {}
 TEST_DEPLOYED_MODEL_ID: str = "test-deployed-model-id"
@@ -41,8 +43,12 @@ BASE_STRING = "airflow.providers.google.common.hooks.base_google.{}"
 ENDPOINT_SERVICE_STRING = "airflow.providers.google.cloud.hooks.vertex_ai.endpoint_service.{}"
 
 
-class TestEndpointServiceWithDefaultProjectIdHook(TestCase):
-    def setUp(self):
+class TestEndpointServiceWithDefaultProjectIdHook:
+    def test_delegate_to_runtime_error(self):
+        with pytest.raises(RuntimeError):
+            EndpointServiceHook(gcp_conn_id=TEST_GCP_CONN_ID, delegate_to="delegate_to")
+
+    def setup_method(self):
         with mock.patch(
             BASE_STRING.format("GoogleBaseHook.__init__"), new=mock_base_gcp_hook_default_project_id
         ):
@@ -54,12 +60,14 @@ class TestEndpointServiceWithDefaultProjectIdHook(TestCase):
             project_id=TEST_PROJECT_ID,
             region=TEST_REGION,
             endpoint=TEST_ENDPOINT,
+            endpoint_id=TEST_ENDPOINT_ID,
         )
         mock_client.assert_called_once_with(TEST_REGION)
         mock_client.return_value.create_endpoint.assert_called_once_with(
             request=dict(
                 parent=mock_client.return_value.common_location_path.return_value,
                 endpoint=TEST_ENDPOINT,
+                endpoint_id=TEST_ENDPOINT_ID,
             ),
             metadata=(),
             retry=DEFAULT,
@@ -210,8 +218,8 @@ class TestEndpointServiceWithDefaultProjectIdHook(TestCase):
         )
 
 
-class TestEndpointServiceWithoutDefaultProjectIdHook(TestCase):
-    def setUp(self):
+class TestEndpointServiceWithoutDefaultProjectIdHook:
+    def setup_method(self):
         with mock.patch(
             BASE_STRING.format("GoogleBaseHook.__init__"), new=mock_base_gcp_hook_no_default_project_id
         ):
@@ -223,12 +231,14 @@ class TestEndpointServiceWithoutDefaultProjectIdHook(TestCase):
             project_id=TEST_PROJECT_ID,
             region=TEST_REGION,
             endpoint=TEST_ENDPOINT,
+            endpoint_id=TEST_ENDPOINT_ID,
         )
         mock_client.assert_called_once_with(TEST_REGION)
         mock_client.return_value.create_endpoint.assert_called_once_with(
             request=dict(
                 parent=mock_client.return_value.common_location_path.return_value,
                 endpoint=TEST_ENDPOINT,
+                endpoint_id=TEST_ENDPOINT_ID,
             ),
             metadata=(),
             retry=DEFAULT,

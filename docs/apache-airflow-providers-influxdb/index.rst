@@ -19,10 +19,18 @@
 ``apache-airflow-providers-influxdb``
 =======================================
 
-Content
--------
 
 .. toctree::
+    :hidden:
+    :maxdepth: 1
+    :caption: Basics
+
+    Home <self>
+    Changelog <changelog>
+    Security <security>
+
+.. toctree::
+    :hidden:
     :maxdepth: 1
     :caption: Guides
 
@@ -30,31 +38,30 @@ Content
     Operators <operators/index>
 
 .. toctree::
+    :hidden:
     :maxdepth: 1
     :caption: References
 
     Python API <_api/airflow/providers/influxdb/index>
 
 .. toctree::
+    :hidden:
     :maxdepth: 1
-    :caption: Resources
+    :caption: System tests
 
-    Example DAGs <https://github.com/apache/airflow/tree/main/airflow/providers/influxdb/example_dags>
+    System Tests <_api/tests/system/providers/influxdb/index>
 
 .. toctree::
+    :hidden:
     :maxdepth: 1
     :caption: Resources
 
-    PyPI Repository <https://pypi.org/project/apache-airflow-providers-influxdb/>
-
-.. toctree::
-    :maxdepth: 1
-    :caption: Resources
-
+    Example DAGs <https://github.com/apache/airflow/tree/providers-influxdb/|version|/tests/system/providers/influxdb>
     PyPI Repository <https://pypi.org/project/apache-airflow-providers-influxdb/>
     Installing from sources <installing-providers-from-sources>
 
 .. toctree::
+    :hidden:
     :maxdepth: 1
     :caption: Commits
 
@@ -64,6 +71,7 @@ Content
 
 
 .. toctree::
+    :hidden:
     :maxdepth: 1
     :caption: Commits
 
@@ -76,7 +84,7 @@ Package apache-airflow-providers-influxdb
 `InfluxDB <https://www.influxdata.com/>`__
 
 
-Release: 1.1.3
+Release: 2.4.0
 
 Provider package
 ----------------
@@ -87,17 +95,19 @@ are in ``airflow.providers.influxdb`` python package.
 Installation
 ------------
 
-You can install this package on top of an existing Airflow 2.1+ installation via
+You can install this package on top of an existing Airflow 2 installation (see ``Requirements`` below)
+for the minimum Airflow version supported) via
 ``pip install apache-airflow-providers-influxdb``
 
-PIP requirements
-----------------
+Requirements
+------------
+
+The minimum Apache Airflow version supported by this provider package is ``2.6.0``.
 
 ===================  ==================
 PIP package          Version required
 ===================  ==================
+``apache-airflow``   ``>=2.6.0``
 ``influxdb-client``  ``>=1.19.0``
-``pandas``           ``>=0.17.1``
+``requests``         ``>=2.26.0``
 ===================  ==================
-
-.. include:: ../../airflow/providers/influxdb/CHANGELOG.rst

@@ -14,46 +14,48 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
+from __future__ import annotations
 
 import os
-from typing import Union
 
-from airflow_breeze.build_image.ci.build_ci_params import BuildCiParams
-from airflow_breeze.build_image.prod.build_prod_params import BuildProdParams
-from airflow_breeze.utils.console import console
+from airflow_breeze.utils.console import Output, get_console
 from airflow_breeze.utils.run_utils import run_command
 
 
-def login_to_docker_registry(image_params: Union[BuildProdParams, BuildCiParams]):
+def login_to_github_docker_registry(github_token: str | None, output: Output | None) -> tuple[int, str]:
     """
-    In case of CI environment, we need to login to GitHub Registry if we want to prepare cache.
-    This method logs in using the params specified.
+    In case of CI environment, we need to login to GitHub Registry.
 
-    :param image_params: parameters to use for Building prod image
+    :param github_token: Github token to use
+    :param output: Output to redirect to
+
+    :return  tuple of error code and message
     """
     if os.environ.get("CI"):
-        if len(image_params.github_token) == 0:
-            console.print("\n[bright_blue]Skip logging in to GitHub Registry. No Token available!")
-        elif image_params.login_to_github_registry != "true":
-            console.print(
-                "\n[bright_blue]Skip logging in to GitHub Registry.\
-                    LOGIN_TO_GITHUB_REGISTRY is set as false"
+        if not github_token:
+            get_console(output=output).print(
+                "\n[info]Skip logging in to GitHub Registry. No Token available!"
             )
-        elif len(image_params.github_token) > 0:
-            run_command(['docker', 'logout', 'ghcr.io'], verbose=True, text=True)
-            run_command(
-                [
-                    'docker',
-                    'login',
-                    '--username',
-                    image_params.github_username,
-                    '--password-stdin',
-                    'ghcr.io',
-                ],
-                verbose=True,
-                text=True,
-                input=image_params.github_token,
-                check=True,
-            )
-        else:
-            console.print('\n[bright_blue]Skip Login to GitHub Container Registry as token is missing')
+            return 0, "Docker login skipped as no token available"
+        run_command(
+            ["docker", "logout", "ghcr.io"],
+            output=output,
+            text=False,
+            check=False,
+        )
+        command_result = run_command(
+            [
+                "docker",
+                "login",
+                "ghcr.io",
+                "--username",
+                "$",
+                "--password-stdin",
+            ],
+            output=output,
+            text=True,
+            input=github_token,
+            check=False,
+        )
+        return command_result.returncode, "Docker login"
+    return 0, "Docker login skipped"

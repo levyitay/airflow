@@ -16,69 +16,84 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
+from __future__ import annotations
+
 import os
+import subprocess
 import sys
 from pathlib import Path
-from subprocess import check_call, check_output
 
-from rich.console import Console
+sys.path.insert(0, str(Path(__file__).parent.resolve()))
+from common_precommit_utils import console, initialize_breeze_precommit
 
-AIRFLOW_SOURCES_DIR = Path(__file__).parents[3]
-BREEZE_IMAGES_DIR = AIRFLOW_SOURCES_DIR / "images" / "breeze"
-
-SCREENSHOT_WIDTH = "120"
-
-
-def get_command_list():
-    comp_env = os.environ.copy()
-    comp_env['COMP_WORDS'] = ""
-    comp_env['COMP_CWORD'] = "0"
-    comp_env['_BREEZE_COMPLETE'] = 'bash_complete'
-    result = check_output('breeze', env=comp_env, text=True)
-    return [x.split(",")[1] for x in result.splitlines(keepends=False)]
-
-
-def print_help_for_all_commands():
-    env = os.environ.copy()
-    env['RECORD_BREEZE_WIDTH'] = SCREENSHOT_WIDTH
-    env['RECORD_BREEZE_TITLE'] = "Breeze commands"
-    env['RECORD_BREEZE_OUTPUT_FILE'] = str(BREEZE_IMAGES_DIR / "output-commands.svg")
-    env['TERM'] = "xterm-256color"
-    check_call(["breeze", "--help"], env=env)
-    for command in get_command_list():
-        env = os.environ.copy()
-        env['RECORD_BREEZE_WIDTH'] = SCREENSHOT_WIDTH
-        env['RECORD_BREEZE_TITLE'] = f"Command: {command}"
-        env['RECORD_BREEZE_OUTPUT_FILE'] = str(BREEZE_IMAGES_DIR / f"output-{command}.svg")
-        env['TERM'] = "xterm-256color"
-        check_call(["breeze", command, "--help"], env=env)
+AIRFLOW_SOURCES_DIR = Path(__file__).parents[3].resolve()
+BREEZE_INSTALL_DIR = AIRFLOW_SOURCES_DIR / "dev" / "breeze"
+BREEZE_DOC_DIR = BREEZE_INSTALL_DIR / "doc"
+BREEZE_IMAGES_DIR = BREEZE_DOC_DIR / "images"
+BREEZE_SOURCES_DIR = BREEZE_INSTALL_DIR / "src"
+FORCE = os.environ.get("FORCE", "false")[0].lower() == "t"
 
 
 def verify_all_commands_described_in_docs():
-    console = Console(width=int(SCREENSHOT_WIDTH), color_system="standard")
     errors = []
-    doc_content = (AIRFLOW_SOURCES_DIR / "BREEZE.rst").read_text()
-    for file in os.listdir(BREEZE_IMAGES_DIR):
-        if file.startswith("output-") and file.endswith(".svg"):
-            command = file[len("output-") : -len(".svg")]
-            if command == "breeze-commands":
-                continue
-            if file not in doc_content:
-                errors.append(command)
+    doc_content = ""
+    for file in BREEZE_DOC_DIR.glob("*.rst"):
+        doc_content += file.read_text()
+    for file_path in BREEZE_IMAGES_DIR.glob("output_*.svg"):
+        command = file_path.stem[len("output_") :]
+        if command != "breeze-commands":
+            if file_path.name in doc_content:
+                console.print(f"[green]OK. The {command} screenshot is embedded in BREEZE documentation.")
             else:
-                console.print(f"[green]OK. The {command} screenshot is embedded in BREEZE.rst.")
+                errors.append(command)
     if errors:
-        console.print("[red]Some of Breeze commands are not described in BREEZE.rst:[/]")
+        console.print("[red]Some of Breeze commands are not described in BREEZE documentation :[/]")
         for command in errors:
             console.print(f"  * [red]{command}[/]")
         console.print()
         console.print(
-            "[bright_yellow]Make sure you describe it and embed ./images/breeze/output-<COMMAND>.svg "
-            "screenshot as image in the BREEZE.rst file.[/]"
+            "[bright_yellow]Make sure you describe it and embed "
+            "./images/breeze/output_<COMMAND>[_<SUBCOMMAND>].svg "
+            f"screenshot as image in one of the .rst docs in {BREEZE_DOC_DIR}.[/]"
         )
         sys.exit(1)
 
 
-if __name__ == '__main__':
-    print_help_for_all_commands()
-    verify_all_commands_described_in_docs()
+def is_regeneration_needed() -> bool:
+    result = subprocess.run(
+        ["breeze", "setup", "regenerate-command-images", "--check-only"],
+        check=False,
+    )
+    return result.returncode != 0
+
+
+initialize_breeze_precommit(__name__, __file__)
+
+return_code = 0
+verify_all_commands_described_in_docs()
+if is_regeneration_needed():
+    console.print(
+        "\n[bright_blue]Some of the commands changed since last time "
+        "images were generated. Regenerating.\n"
+    )
+    return_code = 1
+    res = subprocess.run(
+        ["breeze", "setup", "regenerate-command-images"],
+        check=False,
+    )
+    if res.returncode != 0:
+        console.print("\n[red]Breeze command configuration has changed.\n")
+        console.print("\n[bright_blue]Images have been regenerated.\n")
+        console.print("\n[bright_blue]You might want to run it manually:\n")
+        console.print("\n[magenta]breeze setup regenerate-command-images\n")
+res = subprocess.run(
+    ["breeze", "setup", "check-all-params-in-groups"],
+    check=False,
+)
+if res.returncode != 0:
+    return_code = 1
+    console.print("\n[red]Breeze command configuration has changed.\n")
+    console.print("\n[yellow]Please fix it in the appropriate command_*_config.py file\n")
+    console.print("\n[bright_blue]You can run consistency check manually by running:\n")
+    console.print("\nbreeze setup check-all-params-in-groups\n")
+sys.exit(return_code)

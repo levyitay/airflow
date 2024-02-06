@@ -15,6 +15,8 @@
     specific language governing permissions and limitations
     under the License.
 
+.. _howto/operators:postgres:
+
 How-to Guide for PostgresOperator
 =================================
 
@@ -26,8 +28,8 @@ workflow. Airflow is essentially a graph (Directed Acyclic Graph) made up of tas
 
 A task defined or implemented by a operator is a unit of work in your data pipeline.
 
-The purpose of Postgres Operator is to define tasks involving interactions with the PostgreSQL database.
- In ``Airflow-2.0``, the ``PostgresOperator`` class resides at ``airflow.providers.postgres.operators.postgres``.
+The purpose of :class:`~airflow.providers.postgres.operators.postgres.PostgresOperator` is to define tasks involving
+interactions with a PostgreSQL database.
 
 Under the hood, the :class:`~airflow.providers.postgres.operators.postgres.PostgresOperator` delegates its heavy lifting to the :class:`~airflow.providers.postgres.hooks.postgres.PostgresHook`.
 
@@ -42,7 +44,7 @@ Creating a Postgres database table
 
 The code snippets below are based on Airflow-2.0
 
-.. exampleinclude:: /../../airflow/providers/postgres/example_dags/example_postgres.py
+.. exampleinclude:: /../../tests/system/providers/postgres/example_postgres.py
     :language: python
     :start-after: [START postgres_operator_howto_guide]
     :end-before: [END postgres_operator_howto_guide_create_pet_table]
@@ -157,10 +159,11 @@ class.
 Passing Server Configuration Parameters into PostgresOperator
 -------------------------------------------------------------
 
-PostgresOperator provides the optional ``runtime_parameters`` attribute which makes it possible to set
-the `server configuration parameter values <https://www.postgresql.org/docs/current/runtime-config-client.html>`_ for the SQL request during runtime.
+PostgresOperator provides ``hook_params`` attribute that allows you to pass add parameters to PostgresHook.
+You can pass ``options`` argument this way so that you specify `command-line options <https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-CONNECT-OPTIONS>`_
+sent to the server at connection start.
 
-.. exampleinclude:: /../../airflow/providers/postgres/example_dags/example_postgres.py
+.. exampleinclude:: /../../tests/system/providers/postgres/example_postgres.py
     :language: python
     :start-after: [START postgres_operator_howto_guide_get_birth_date]
     :end-before: [END postgres_operator_howto_guide_get_birth_date]
@@ -171,7 +174,7 @@ The complete Postgres Operator DAG
 
 When we put everything together, our DAG should look like this:
 
-.. exampleinclude:: /../../airflow/providers/postgres/example_dags/example_postgres.py
+.. exampleinclude:: /../../tests/system/providers/postgres/example_postgres.py
     :language: python
     :start-after: [START postgres_operator_howto_guide]
     :end-before: [END postgres_operator_howto_guide]
@@ -181,8 +184,8 @@ Conclusion
 ----------
 
 In this how-to guide we explored the Apache Airflow PostgreOperator. Let's quickly highlight the key takeaways.
-In Airflow-2.0, PostgresOperator class now resides in the ``providers`` package. It is best practice to create subdirectory
-called ``sql`` in your ``dags`` directory where you can store your sql files. This will make your code more elegant and more
-maintainable. And finally, we looked at the different ways you can dynamically pass parameters into our PostgresOperator
-tasks using ``parameters`` or ``params`` attribute and how you can control the server configuration parameters by passing
-the ``runtime_parameters`` attribute.
+It is best practice to create subdirectory called ``sql`` in your ``dags`` directory where you can store your sql files.
+This will make your code more elegant and more maintainable.
+And finally, we looked at the different ways you can dynamically pass parameters into our PostgresOperator
+tasks using ``parameters`` or ``params`` attribute and how you can control the session parameters by passing
+options in the ``hook_params`` attribute.

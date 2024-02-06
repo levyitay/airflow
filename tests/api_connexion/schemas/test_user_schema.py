@@ -14,17 +14,20 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
+from __future__ import annotations
 
 import pytest
 
 from airflow.api_connexion.schemas.user_schema import user_collection_item_schema, user_schema
+from airflow.providers.fab.auth_manager.models import User
 from airflow.utils import timezone
-from airflow.www.fab_security.sqla.models import User
 from tests.test_utils.api_connexion_utils import create_role, delete_role
 
 TEST_EMAIL = "test@example.org"
 
 DEFAULT_TIME = "2021-01-09T13:59:56.336000+00:00"
+
+pytestmark = pytest.mark.db_test
 
 
 @pytest.fixture(scope="module")
@@ -37,7 +40,7 @@ def configured_app(minimal_app_for_api):
     )
     yield app
 
-    delete_role(app, 'TestRole')  # type:ignore
+    delete_role(app, "TestRole")  # type:ignore
 
 
 class TestUserBase:
@@ -73,17 +76,17 @@ class TestUserCollectionItemSchema(TestUserBase):
         deserialized_user = user_collection_item_schema.dump(user)
         # No user_id and password in dump
         assert deserialized_user == {
-            'created_on': DEFAULT_TIME,
-            'email': 'test@example.org',
-            'changed_on': DEFAULT_TIME,
-            'active': None,
-            'last_login': None,
-            'last_name': 'Bar',
-            'fail_login_count': None,
-            'first_name': 'Foo',
-            'username': 'test',
-            'login_count': None,
-            'roles': [{'name': 'TestRole'}],
+            "created_on": DEFAULT_TIME,
+            "email": "test@example.org",
+            "changed_on": DEFAULT_TIME,
+            "active": None,
+            "last_login": None,
+            "last_name": "Bar",
+            "fail_login_count": None,
+            "first_name": "Foo",
+            "username": "test",
+            "login_count": None,
+            "roles": [{"name": "TestRole"}],
         }
 
 
@@ -104,34 +107,34 @@ class TestUserSchema(TestUserBase):
         deserialized_user = user_schema.dump(user)
         # No user_id and password in dump
         assert deserialized_user == {
-            'roles': [],
-            'created_on': DEFAULT_TIME,
-            'email': 'test@example.org',
-            'changed_on': DEFAULT_TIME,
-            'active': None,
-            'last_login': None,
-            'last_name': 'Bar',
-            'fail_login_count': None,
-            'first_name': 'Foo',
-            'username': 'test',
-            'login_count': None,
+            "roles": [],
+            "created_on": DEFAULT_TIME,
+            "email": "test@example.org",
+            "changed_on": DEFAULT_TIME,
+            "active": None,
+            "last_login": None,
+            "last_name": "Bar",
+            "fail_login_count": None,
+            "first_name": "Foo",
+            "username": "test",
+            "login_count": None,
         }
 
     def test_deserialize_user(self):
         user_dump = {
-            'roles': [{'name': 'TestRole'}],
-            'email': 'test@example.org',
-            'last_name': 'Bar',
-            'first_name': 'Foo',
-            'username': 'test',
-            'password': 'test',  # loads password
+            "roles": [{"name": "TestRole"}],
+            "email": "test@example.org",
+            "last_name": "Bar",
+            "first_name": "Foo",
+            "username": "test",
+            "password": "test",  # loads password
         }
         result = user_schema.load(user_dump)
         assert result == {
-            'roles': [{'name': "TestRole"}],
-            'email': 'test@example.org',
-            'last_name': 'Bar',
-            'first_name': 'Foo',
-            'username': 'test',
-            'password': 'test',  # Password loaded
+            "roles": [{"name": "TestRole"}],
+            "email": "test@example.org",
+            "last_name": "Bar",
+            "first_name": "Foo",
+            "username": "test",
+            "password": "test",  # Password loaded
         }

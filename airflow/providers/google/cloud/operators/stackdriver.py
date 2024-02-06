@@ -15,27 +15,33 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
+from __future__ import annotations
 
-from typing import TYPE_CHECKING, Optional, Sequence, Tuple, Union
+from typing import TYPE_CHECKING, Sequence
 
 from google.api_core.gapic_v1.method import DEFAULT, _MethodDefault
-from google.api_core.retry import Retry
 from google.cloud.monitoring_v3 import AlertPolicy, NotificationChannel
 
-from airflow.models import BaseOperator
 from airflow.providers.google.cloud.hooks.stackdriver import StackdriverHook
+from airflow.providers.google.cloud.links.stackdriver import (
+    StackdriverNotificationsLink,
+    StackdriverPoliciesLink,
+)
+from airflow.providers.google.cloud.operators.cloud_base import GoogleCloudBaseOperator
 
 if TYPE_CHECKING:
+    from google.api_core.retry import Retry
+
     from airflow.utils.context import Context
 
 
-class StackdriverListAlertPoliciesOperator(BaseOperator):
+class StackdriverListAlertPoliciesOperator(GoogleCloudBaseOperator):
     """
-    Fetches all the Alert Policies identified by the filter passed as
-    filter parameter. The desired return type can be specified by the
-    format parameter, the supported formats are "dict", "json" and None
-    which returns python dictionary, stringified JSON and protobuf
-    respectively.
+    Fetches all the Alert Policies identified by the filter passed as filter parameter.
+
+    The desired return type can be specified by the format parameter, the supported
+    formats are "dict", "json" and None which returns python dictionary, stringified
+    JSON and protobuf respectively.
 
     .. seealso::
         For more information on how to use this operator, take a look at the guide:
@@ -65,9 +71,6 @@ class StackdriverListAlertPoliciesOperator(BaseOperator):
     :param gcp_conn_id: (Optional) The connection ID used to connect to Google
         Cloud Platform.
     :param project_id: The project to fetch alerts from.
-    :param delegate_to: The account to impersonate using domain-wide delegation of authority,
-        if any. For this to work, the service account making the request must have
-        domain-wide delegation enabled.
     :param impersonation_chain: Optional service account to impersonate using short-term
         credentials, or chained list of accounts required to get the access_token
         of the last account in the list, which will be impersonated in the request.
@@ -79,25 +82,25 @@ class StackdriverListAlertPoliciesOperator(BaseOperator):
     """
 
     template_fields: Sequence[str] = (
-        'filter_',
-        'impersonation_chain',
+        "filter_",
+        "impersonation_chain",
     )
+    operator_extra_links = (StackdriverPoliciesLink(),)
     ui_color = "#e5ffcc"
 
     def __init__(
         self,
         *,
-        format_: Optional[str] = None,
-        filter_: Optional[str] = None,
-        order_by: Optional[str] = None,
-        page_size: Optional[int] = None,
-        retry: Union[Retry, _MethodDefault] = DEFAULT,
-        timeout: Optional[float] = None,
-        metadata: Sequence[Tuple[str, str]] = (),
-        gcp_conn_id: str = 'google_cloud_default',
-        project_id: Optional[str] = None,
-        delegate_to: Optional[str] = None,
-        impersonation_chain: Optional[Union[str, Sequence[str]]] = None,
+        format_: str | None = None,
+        filter_: str | None = None,
+        order_by: str | None = None,
+        page_size: int | None = None,
+        retry: Retry | _MethodDefault = DEFAULT,
+        timeout: float | None = None,
+        metadata: Sequence[tuple[str, str]] = (),
+        gcp_conn_id: str = "google_cloud_default",
+        project_id: str | None = None,
+        impersonation_chain: str | Sequence[str] | None = None,
         **kwargs,
     ) -> None:
         super().__init__(**kwargs)
@@ -110,13 +113,12 @@ class StackdriverListAlertPoliciesOperator(BaseOperator):
         self.metadata = metadata
         self.gcp_conn_id = gcp_conn_id
         self.project_id = project_id
-        self.delegate_to = delegate_to
         self.impersonation_chain = impersonation_chain
-        self.hook: Optional[StackdriverHook] = None
+        self.hook: StackdriverHook | None = None
 
-    def execute(self, context: 'Context'):
+    def execute(self, context: Context):
         self.log.info(
-            'List Alert Policies: Project id: %s Format: %s Filter: %s Order By: %s Page Size: %s',
+            "List Alert Policies: Project id: %s Format: %s Filter: %s Order By: %s Page Size: %s",
             self.project_id,
             self.format_,
             self.filter_,
@@ -126,7 +128,6 @@ class StackdriverListAlertPoliciesOperator(BaseOperator):
         if self.hook is None:
             self.hook = StackdriverHook(
                 gcp_conn_id=self.gcp_conn_id,
-                delegate_to=self.delegate_to,
                 impersonation_chain=self.impersonation_chain,
             )
 
@@ -140,13 +141,19 @@ class StackdriverListAlertPoliciesOperator(BaseOperator):
             timeout=self.timeout,
             metadata=self.metadata,
         )
+        StackdriverPoliciesLink.persist(
+            context=context,
+            operator_instance=self,
+            project_id=self.project_id or self.hook.project_id,
+        )
         return [AlertPolicy.to_dict(policy) for policy in result]
 
 
-class StackdriverEnableAlertPoliciesOperator(BaseOperator):
+class StackdriverEnableAlertPoliciesOperator(GoogleCloudBaseOperator):
     """
-    Enables one or more disabled alerting policies identified by filter
-    parameter. Inoperative in case the policy is already enabled.
+    Enables one or more disabled alerting policies identified by filter parameter.
+
+    Inoperative in case the policy is already enabled.
 
     .. seealso::
         For more information on how to use this operator, take a look at the guide:
@@ -164,9 +171,6 @@ class StackdriverEnableAlertPoliciesOperator(BaseOperator):
     :param gcp_conn_id: (Optional) The connection ID used to connect to Google
         Cloud Platform.
     :param project_id: The project in which alert needs to be enabled.
-    :param delegate_to: The account to impersonate using domain-wide delegation of authority,
-        if any. For this to work, the service account making the request must have
-        domain-wide delegation enabled.
     :param impersonation_chain: Optional service account to impersonate using short-term
         credentials, or chained list of accounts required to get the access_token
         of the last account in the list, which will be impersonated in the request.
@@ -179,40 +183,38 @@ class StackdriverEnableAlertPoliciesOperator(BaseOperator):
 
     ui_color = "#e5ffcc"
     template_fields: Sequence[str] = (
-        'filter_',
-        'impersonation_chain',
+        "filter_",
+        "impersonation_chain",
     )
+    operator_extra_links = (StackdriverPoliciesLink(),)
 
     def __init__(
         self,
         *,
-        filter_: Optional[str] = None,
-        retry: Union[Retry, _MethodDefault] = DEFAULT,
-        timeout: Optional[float] = None,
-        metadata: Sequence[Tuple[str, str]] = (),
-        gcp_conn_id: str = 'google_cloud_default',
-        project_id: Optional[str] = None,
-        delegate_to: Optional[str] = None,
-        impersonation_chain: Optional[Union[str, Sequence[str]]] = None,
+        filter_: str | None = None,
+        retry: Retry | _MethodDefault = DEFAULT,
+        timeout: float | None = None,
+        metadata: Sequence[tuple[str, str]] = (),
+        gcp_conn_id: str = "google_cloud_default",
+        project_id: str | None = None,
+        impersonation_chain: str | Sequence[str] | None = None,
         **kwargs,
     ) -> None:
         super().__init__(**kwargs)
         self.gcp_conn_id = gcp_conn_id
         self.project_id = project_id
-        self.delegate_to = delegate_to
         self.filter_ = filter_
         self.retry = retry
         self.timeout = timeout
         self.metadata = metadata
         self.impersonation_chain = impersonation_chain
-        self.hook: Optional[StackdriverHook] = None
+        self.hook: StackdriverHook | None = None
 
-    def execute(self, context: 'Context'):
-        self.log.info('Enable Alert Policies: Project id: %s Filter: %s', self.project_id, self.filter_)
+    def execute(self, context: Context):
+        self.log.info("Enable Alert Policies: Project id: %s Filter: %s", self.project_id, self.filter_)
         if self.hook is None:
             self.hook = StackdriverHook(
                 gcp_conn_id=self.gcp_conn_id,
-                delegate_to=self.delegate_to,
                 impersonation_chain=self.impersonation_chain,
             )
         self.hook.enable_alert_policies(
@@ -222,13 +224,19 @@ class StackdriverEnableAlertPoliciesOperator(BaseOperator):
             timeout=self.timeout,
             metadata=self.metadata,
         )
+        StackdriverPoliciesLink.persist(
+            context=context,
+            operator_instance=self,
+            project_id=self.project_id or self.hook.project_id,
+        )
 
 
 # Disable Alert Operator
-class StackdriverDisableAlertPoliciesOperator(BaseOperator):
+class StackdriverDisableAlertPoliciesOperator(GoogleCloudBaseOperator):
     """
-    Disables one or more enabled alerting policies identified by filter
-    parameter. Inoperative in case the policy is already disabled.
+    Disables one or more enabled alerting policies identified by filter parameter.
+
+    Inoperative in case the policy is already disabled.
 
     .. seealso::
         For more information on how to use this operator, take a look at the guide:
@@ -246,9 +254,6 @@ class StackdriverDisableAlertPoliciesOperator(BaseOperator):
     :param gcp_conn_id: (Optional) The connection ID used to connect to Google
         Cloud Platform.
     :param project_id: The project in which alert needs to be disabled.
-    :param delegate_to: The account to impersonate using domain-wide delegation of authority,
-        if any. For this to work, the service account making the request must have
-        domain-wide delegation enabled.
     :param impersonation_chain: Optional service account to impersonate using short-term
         credentials, or chained list of accounts required to get the access_token
         of the last account in the list, which will be impersonated in the request.
@@ -261,40 +266,38 @@ class StackdriverDisableAlertPoliciesOperator(BaseOperator):
 
     ui_color = "#e5ffcc"
     template_fields: Sequence[str] = (
-        'filter_',
-        'impersonation_chain',
+        "filter_",
+        "impersonation_chain",
     )
+    operator_extra_links = (StackdriverPoliciesLink(),)
 
     def __init__(
         self,
         *,
-        filter_: Optional[str] = None,
-        retry: Union[Retry, _MethodDefault] = DEFAULT,
-        timeout: Optional[float] = None,
-        metadata: Sequence[Tuple[str, str]] = (),
-        gcp_conn_id: str = 'google_cloud_default',
-        project_id: Optional[str] = None,
-        delegate_to: Optional[str] = None,
-        impersonation_chain: Optional[Union[str, Sequence[str]]] = None,
+        filter_: str | None = None,
+        retry: Retry | _MethodDefault = DEFAULT,
+        timeout: float | None = None,
+        metadata: Sequence[tuple[str, str]] = (),
+        gcp_conn_id: str = "google_cloud_default",
+        project_id: str | None = None,
+        impersonation_chain: str | Sequence[str] | None = None,
         **kwargs,
     ) -> None:
         super().__init__(**kwargs)
         self.gcp_conn_id = gcp_conn_id
         self.project_id = project_id
-        self.delegate_to = delegate_to
         self.filter_ = filter_
         self.retry = retry
         self.timeout = timeout
         self.metadata = metadata
         self.impersonation_chain = impersonation_chain
-        self.hook: Optional[StackdriverHook] = None
+        self.hook: StackdriverHook | None = None
 
-    def execute(self, context: 'Context'):
-        self.log.info('Disable Alert Policies: Project id: %s Filter: %s', self.project_id, self.filter_)
+    def execute(self, context: Context):
+        self.log.info("Disable Alert Policies: Project id: %s Filter: %s", self.project_id, self.filter_)
         if self.hook is None:
             self.hook = StackdriverHook(
                 gcp_conn_id=self.gcp_conn_id,
-                delegate_to=self.delegate_to,
                 impersonation_chain=self.impersonation_chain,
             )
         self.hook.disable_alert_policies(
@@ -304,12 +307,16 @@ class StackdriverDisableAlertPoliciesOperator(BaseOperator):
             timeout=self.timeout,
             metadata=self.metadata,
         )
+        StackdriverPoliciesLink.persist(
+            context=context,
+            operator_instance=self,
+            project_id=self.project_id or self.hook.project_id,
+        )
 
 
-class StackdriverUpsertAlertOperator(BaseOperator):
+class StackdriverUpsertAlertOperator(GoogleCloudBaseOperator):
     """
-    Creates a new alert or updates an existing policy identified
-    the name field in the alerts parameter.
+    Creates a new alert or updates an existing policy identified the name field in the alerts parameter.
 
     .. seealso::
         For more information on how to use this operator, take a look at the guide:
@@ -328,9 +335,6 @@ class StackdriverUpsertAlertOperator(BaseOperator):
     :param gcp_conn_id: (Optional) The connection ID used to connect to Google
         Cloud Platform.
     :param project_id: The project in which alert needs to be created/updated.
-    :param delegate_to: The account to impersonate using domain-wide delegation of authority,
-        if any. For this to work, the service account making the request must have
-        domain-wide delegation enabled.
     :param impersonation_chain: Optional service account to impersonate using short-term
         credentials, or chained list of accounts required to get the access_token
         of the last account in the list, which will be impersonated in the request.
@@ -342,10 +346,11 @@ class StackdriverUpsertAlertOperator(BaseOperator):
     """
 
     template_fields: Sequence[str] = (
-        'alerts',
-        'impersonation_chain',
+        "alerts",
+        "impersonation_chain",
     )
-    template_ext: Sequence[str] = ('.json',)
+    template_ext: Sequence[str] = (".json",)
+    operator_extra_links = (StackdriverPoliciesLink(),)
 
     ui_color = "#e5ffcc"
 
@@ -353,13 +358,12 @@ class StackdriverUpsertAlertOperator(BaseOperator):
         self,
         *,
         alerts: str,
-        retry: Union[Retry, _MethodDefault] = DEFAULT,
-        timeout: Optional[float] = None,
-        metadata: Sequence[Tuple[str, str]] = (),
-        gcp_conn_id: str = 'google_cloud_default',
-        project_id: Optional[str] = None,
-        delegate_to: Optional[str] = None,
-        impersonation_chain: Optional[Union[str, Sequence[str]]] = None,
+        retry: Retry | _MethodDefault = DEFAULT,
+        timeout: float | None = None,
+        metadata: Sequence[tuple[str, str]] = (),
+        gcp_conn_id: str = "google_cloud_default",
+        project_id: str | None = None,
+        impersonation_chain: str | Sequence[str] | None = None,
         **kwargs,
     ) -> None:
         super().__init__(**kwargs)
@@ -369,16 +373,14 @@ class StackdriverUpsertAlertOperator(BaseOperator):
         self.metadata = metadata
         self.gcp_conn_id = gcp_conn_id
         self.project_id = project_id
-        self.delegate_to = delegate_to
         self.impersonation_chain = impersonation_chain
-        self.hook: Optional[StackdriverHook] = None
+        self.hook: StackdriverHook | None = None
 
-    def execute(self, context: 'Context'):
-        self.log.info('Upsert Alert Policies: Alerts: %s Project id: %s', self.alerts, self.project_id)
+    def execute(self, context: Context):
+        self.log.info("Upsert Alert Policies: Alerts: %s Project id: %s", self.alerts, self.project_id)
         if self.hook is None:
             self.hook = StackdriverHook(
                 gcp_conn_id=self.gcp_conn_id,
-                delegate_to=self.delegate_to,
                 impersonation_chain=self.impersonation_chain,
             )
         self.hook.upsert_alert(
@@ -388,9 +390,14 @@ class StackdriverUpsertAlertOperator(BaseOperator):
             timeout=self.timeout,
             metadata=self.metadata,
         )
+        StackdriverPoliciesLink.persist(
+            context=context,
+            operator_instance=self,
+            project_id=self.project_id or self.hook.project_id,
+        )
 
 
-class StackdriverDeleteAlertOperator(BaseOperator):
+class StackdriverDeleteAlertOperator(GoogleCloudBaseOperator):
     """
     Deletes an alerting policy.
 
@@ -409,9 +416,6 @@ class StackdriverDeleteAlertOperator(BaseOperator):
     :param gcp_conn_id: (Optional) The connection ID used to connect to Google
         Cloud Platform.
     :param project_id: The project from which alert needs to be deleted.
-    :param delegate_to: The account to impersonate using domain-wide delegation of authority,
-        if any. For this to work, the service account making the request must have
-        domain-wide delegation enabled.
     :param impersonation_chain: Optional service account to impersonate using short-term
         credentials, or chained list of accounts required to get the access_token
         of the last account in the list, which will be impersonated in the request.
@@ -423,8 +427,8 @@ class StackdriverDeleteAlertOperator(BaseOperator):
     """
 
     template_fields: Sequence[str] = (
-        'name',
-        'impersonation_chain',
+        "name",
+        "impersonation_chain",
     )
 
     ui_color = "#e5ffcc"
@@ -433,13 +437,12 @@ class StackdriverDeleteAlertOperator(BaseOperator):
         self,
         *,
         name: str,
-        retry: Union[Retry, _MethodDefault] = DEFAULT,
-        timeout: Optional[float] = None,
-        metadata: Sequence[Tuple[str, str]] = (),
-        gcp_conn_id: str = 'google_cloud_default',
-        project_id: Optional[str] = None,
-        delegate_to: Optional[str] = None,
-        impersonation_chain: Optional[Union[str, Sequence[str]]] = None,
+        retry: Retry | _MethodDefault = DEFAULT,
+        timeout: float | None = None,
+        metadata: Sequence[tuple[str, str]] = (),
+        gcp_conn_id: str = "google_cloud_default",
+        project_id: str | None = None,
+        impersonation_chain: str | Sequence[str] | None = None,
         **kwargs,
     ) -> None:
         super().__init__(**kwargs)
@@ -449,16 +452,14 @@ class StackdriverDeleteAlertOperator(BaseOperator):
         self.metadata = metadata
         self.gcp_conn_id = gcp_conn_id
         self.project_id = project_id
-        self.delegate_to = delegate_to
         self.impersonation_chain = impersonation_chain
-        self.hook: Optional[StackdriverHook] = None
+        self.hook: StackdriverHook | None = None
 
-    def execute(self, context: 'Context'):
-        self.log.info('Delete Alert Policy: Project id: %s Name: %s', self.project_id, self.name)
+    def execute(self, context: Context):
+        self.log.info("Delete Alert Policy: Project id: %s Name: %s", self.project_id, self.name)
         if self.hook is None:
             self.hook = StackdriverHook(
                 gcp_conn_id=self.gcp_conn_id,
-                delegate_to=self.delegate_to,
                 impersonation_chain=self.impersonation_chain,
             )
         self.hook.delete_alert_policy(
@@ -469,13 +470,13 @@ class StackdriverDeleteAlertOperator(BaseOperator):
         )
 
 
-class StackdriverListNotificationChannelsOperator(BaseOperator):
+class StackdriverListNotificationChannelsOperator(GoogleCloudBaseOperator):
     """
-    Fetches all the Notification Channels identified by the filter passed as
-    filter parameter. The desired return type can be specified by the
-    format parameter, the supported formats are "dict", "json" and None
-    which returns python dictionary, stringified JSON and protobuf
-    respectively.
+    Fetches all the Notification Channels identified by the filter passed as filter parameter.
+
+    The desired return type can be specified by the format parameter, the
+    supported formats are "dict", "json" and None which returns python
+    dictionary, stringified JSON and protobuf respectively.
 
     .. seealso::
         For more information on how to use this operator, take a look at the guide:
@@ -505,9 +506,6 @@ class StackdriverListNotificationChannelsOperator(BaseOperator):
     :param gcp_conn_id: (Optional) The connection ID used to connect to Google
         Cloud Platform.
     :param project_id: The project to fetch notification channels from.
-    :param delegate_to: The account to impersonate using domain-wide delegation of authority,
-        if any. For this to work, the service account making the request must have
-        domain-wide delegation enabled.
     :param impersonation_chain: Optional service account to impersonate using short-term
         credentials, or chained list of accounts required to get the access_token
         of the last account in the list, which will be impersonated in the request.
@@ -519,26 +517,26 @@ class StackdriverListNotificationChannelsOperator(BaseOperator):
     """
 
     template_fields: Sequence[str] = (
-        'filter_',
-        'impersonation_chain',
+        "filter_",
+        "impersonation_chain",
     )
+    operator_extra_links = (StackdriverNotificationsLink(),)
 
     ui_color = "#e5ffcc"
 
     def __init__(
         self,
         *,
-        format_: Optional[str] = None,
-        filter_: Optional[str] = None,
-        order_by: Optional[str] = None,
-        page_size: Optional[int] = None,
-        retry: Union[Retry, _MethodDefault] = DEFAULT,
-        timeout: Optional[float] = None,
-        metadata: Sequence[Tuple[str, str]] = (),
-        gcp_conn_id: str = 'google_cloud_default',
-        project_id: Optional[str] = None,
-        delegate_to: Optional[str] = None,
-        impersonation_chain: Optional[Union[str, Sequence[str]]] = None,
+        format_: str | None = None,
+        filter_: str | None = None,
+        order_by: str | None = None,
+        page_size: int | None = None,
+        retry: Retry | _MethodDefault = DEFAULT,
+        timeout: float | None = None,
+        metadata: Sequence[tuple[str, str]] = (),
+        gcp_conn_id: str = "google_cloud_default",
+        project_id: str | None = None,
+        impersonation_chain: str | Sequence[str] | None = None,
         **kwargs,
     ) -> None:
         super().__init__(**kwargs)
@@ -551,13 +549,12 @@ class StackdriverListNotificationChannelsOperator(BaseOperator):
         self.metadata = metadata
         self.gcp_conn_id = gcp_conn_id
         self.project_id = project_id
-        self.delegate_to = delegate_to
         self.impersonation_chain = impersonation_chain
-        self.hook: Optional[StackdriverHook] = None
+        self.hook: StackdriverHook | None = None
 
-    def execute(self, context: 'Context'):
+    def execute(self, context: Context):
         self.log.info(
-            'List Notification Channels: Project id: %s Format: %s Filter: %s Order By: %s Page Size: %s',
+            "List Notification Channels: Project id: %s Format: %s Filter: %s Order By: %s Page Size: %s",
             self.project_id,
             self.format_,
             self.filter_,
@@ -567,7 +564,6 @@ class StackdriverListNotificationChannelsOperator(BaseOperator):
         if self.hook is None:
             self.hook = StackdriverHook(
                 gcp_conn_id=self.gcp_conn_id,
-                delegate_to=self.delegate_to,
                 impersonation_chain=self.impersonation_chain,
             )
         channels = self.hook.list_notification_channels(
@@ -580,14 +576,19 @@ class StackdriverListNotificationChannelsOperator(BaseOperator):
             timeout=self.timeout,
             metadata=self.metadata,
         )
-        result = [NotificationChannel.to_dict(channel) for channel in channels]
-        return result
+        StackdriverNotificationsLink.persist(
+            context=context,
+            operator_instance=self,
+            project_id=self.project_id or self.hook.project_id,
+        )
+        return [NotificationChannel.to_dict(channel) for channel in channels]
 
 
-class StackdriverEnableNotificationChannelsOperator(BaseOperator):
+class StackdriverEnableNotificationChannelsOperator(GoogleCloudBaseOperator):
     """
-    Enables one or more disabled alerting policies identified by filter
-    parameter. Inoperative in case the policy is already enabled.
+    Enables one or more disabled alerting policies identified by filter parameter.
+
+    Inoperative in case the policy is already enabled.
 
     .. seealso::
         For more information on how to use this operator, take a look at the guide:
@@ -605,9 +606,6 @@ class StackdriverEnableNotificationChannelsOperator(BaseOperator):
     :param gcp_conn_id: (Optional) The connection ID used to connect to Google
         Cloud Platform.
     :param project_id: The location used for the operation.
-    :param delegate_to: The account to impersonate using domain-wide delegation of authority,
-        if any. For this to work, the service account making the request must have
-        domain-wide delegation enabled.
     :param impersonation_chain: Optional service account to impersonate using short-term
         credentials, or chained list of accounts required to get the access_token
         of the last account in the list, which will be impersonated in the request.
@@ -619,23 +617,23 @@ class StackdriverEnableNotificationChannelsOperator(BaseOperator):
     """
 
     template_fields: Sequence[str] = (
-        'filter_',
-        'impersonation_chain',
+        "filter_",
+        "impersonation_chain",
     )
+    operator_extra_links = (StackdriverNotificationsLink(),)
 
     ui_color = "#e5ffcc"
 
     def __init__(
         self,
         *,
-        filter_: Optional[str] = None,
-        retry: Union[Retry, _MethodDefault] = DEFAULT,
-        timeout: Optional[float] = None,
-        metadata: Sequence[Tuple[str, str]] = (),
-        gcp_conn_id: str = 'google_cloud_default',
-        project_id: Optional[str] = None,
-        delegate_to: Optional[str] = None,
-        impersonation_chain: Optional[Union[str, Sequence[str]]] = None,
+        filter_: str | None = None,
+        retry: Retry | _MethodDefault = DEFAULT,
+        timeout: float | None = None,
+        metadata: Sequence[tuple[str, str]] = (),
+        gcp_conn_id: str = "google_cloud_default",
+        project_id: str | None = None,
+        impersonation_chain: str | Sequence[str] | None = None,
         **kwargs,
     ) -> None:
         super().__init__(**kwargs)
@@ -645,18 +643,16 @@ class StackdriverEnableNotificationChannelsOperator(BaseOperator):
         self.metadata = metadata
         self.gcp_conn_id = gcp_conn_id
         self.project_id = project_id
-        self.delegate_to = delegate_to
         self.impersonation_chain = impersonation_chain
-        self.hook: Optional[StackdriverHook] = None
+        self.hook: StackdriverHook | None = None
 
-    def execute(self, context: 'Context'):
+    def execute(self, context: Context):
         self.log.info(
-            'Enable Notification Channels: Project id: %s Filter: %s', self.project_id, self.filter_
+            "Enable Notification Channels: Project id: %s Filter: %s", self.project_id, self.filter_
         )
         if self.hook is None:
             self.hook = StackdriverHook(
                 gcp_conn_id=self.gcp_conn_id,
-                delegate_to=self.delegate_to,
                 impersonation_chain=self.impersonation_chain,
             )
         self.hook.enable_notification_channels(
@@ -666,12 +662,18 @@ class StackdriverEnableNotificationChannelsOperator(BaseOperator):
             timeout=self.timeout,
             metadata=self.metadata,
         )
+        StackdriverNotificationsLink.persist(
+            context=context,
+            operator_instance=self,
+            project_id=self.project_id or self.hook.project_id,
+        )
 
 
-class StackdriverDisableNotificationChannelsOperator(BaseOperator):
+class StackdriverDisableNotificationChannelsOperator(GoogleCloudBaseOperator):
     """
-    Disables one or more enabled notification channels identified by filter
-    parameter. Inoperative in case the policy is already disabled.
+    Disables one or more enabled notification channels identified by filter parameter.
+
+    Inoperative in case the policy is already disabled.
 
     .. seealso::
         For more information on how to use this operator, take a look at the guide:
@@ -689,9 +691,6 @@ class StackdriverDisableNotificationChannelsOperator(BaseOperator):
     :param gcp_conn_id: (Optional) The connection ID used to connect to Google
         Cloud Platform.
     :param project_id: The project in which notification channels needs to be enabled.
-    :param delegate_to: The account to impersonate using domain-wide delegation of authority,
-        if any. For this to work, the service account making the request must have
-        domain-wide delegation enabled.
     :param impersonation_chain: Optional service account to impersonate using short-term
         credentials, or chained list of accounts required to get the access_token
         of the last account in the list, which will be impersonated in the request.
@@ -703,23 +702,23 @@ class StackdriverDisableNotificationChannelsOperator(BaseOperator):
     """
 
     template_fields: Sequence[str] = (
-        'filter_',
-        'impersonation_chain',
+        "filter_",
+        "impersonation_chain",
     )
+    operator_extra_links = (StackdriverNotificationsLink(),)
 
     ui_color = "#e5ffcc"
 
     def __init__(
         self,
         *,
-        filter_: Optional[str] = None,
-        retry: Union[Retry, _MethodDefault] = DEFAULT,
-        timeout: Optional[float] = None,
-        metadata: Sequence[Tuple[str, str]] = (),
-        gcp_conn_id: str = 'google_cloud_default',
-        project_id: Optional[str] = None,
-        delegate_to: Optional[str] = None,
-        impersonation_chain: Optional[Union[str, Sequence[str]]] = None,
+        filter_: str | None = None,
+        retry: Retry | _MethodDefault = DEFAULT,
+        timeout: float | None = None,
+        metadata: Sequence[tuple[str, str]] = (),
+        gcp_conn_id: str = "google_cloud_default",
+        project_id: str | None = None,
+        impersonation_chain: str | Sequence[str] | None = None,
         **kwargs,
     ) -> None:
         super().__init__(**kwargs)
@@ -729,18 +728,16 @@ class StackdriverDisableNotificationChannelsOperator(BaseOperator):
         self.metadata = metadata
         self.gcp_conn_id = gcp_conn_id
         self.project_id = project_id
-        self.delegate_to = delegate_to
         self.impersonation_chain = impersonation_chain
-        self.hook: Optional[StackdriverHook] = None
+        self.hook: StackdriverHook | None = None
 
-    def execute(self, context: 'Context'):
+    def execute(self, context: Context):
         self.log.info(
-            'Disable Notification Channels: Project id: %s Filter: %s', self.project_id, self.filter_
+            "Disable Notification Channels: Project id: %s Filter: %s", self.project_id, self.filter_
         )
         if self.hook is None:
             self.hook = StackdriverHook(
                 gcp_conn_id=self.gcp_conn_id,
-                delegate_to=self.delegate_to,
                 impersonation_chain=self.impersonation_chain,
             )
         self.hook.disable_notification_channels(
@@ -750,12 +747,18 @@ class StackdriverDisableNotificationChannelsOperator(BaseOperator):
             timeout=self.timeout,
             metadata=self.metadata,
         )
+        StackdriverNotificationsLink.persist(
+            context=context,
+            operator_instance=self,
+            project_id=self.project_id or self.hook.project_id,
+        )
 
 
-class StackdriverUpsertNotificationChannelOperator(BaseOperator):
+class StackdriverUpsertNotificationChannelOperator(GoogleCloudBaseOperator):
     """
-    Creates a new notification or updates an existing notification channel
-    identified the name field in the alerts parameter.
+    Create a new notification or updates an existing notification channel.
+
+    Channel is identified by the name field in the alerts parameter.
 
     .. seealso::
         For more information on how to use this operator, take a look at the guide:
@@ -774,9 +777,6 @@ class StackdriverUpsertNotificationChannelOperator(BaseOperator):
     :param gcp_conn_id: (Optional) The connection ID used to connect to Google
         Cloud Platform.
     :param project_id: The project in which notification channels needs to be created/updated.
-    :param delegate_to: The account to impersonate using domain-wide delegation of authority,
-        if any. For this to work, the service account making the request must have
-        domain-wide delegation enabled.
     :param impersonation_chain: Optional service account to impersonate using short-term
         credentials, or chained list of accounts required to get the access_token
         of the last account in the list, which will be impersonated in the request.
@@ -788,10 +788,11 @@ class StackdriverUpsertNotificationChannelOperator(BaseOperator):
     """
 
     template_fields: Sequence[str] = (
-        'channels',
-        'impersonation_chain',
+        "channels",
+        "impersonation_chain",
     )
-    template_ext: Sequence[str] = ('.json',)
+    template_ext: Sequence[str] = (".json",)
+    operator_extra_links = (StackdriverNotificationsLink(),)
 
     ui_color = "#e5ffcc"
 
@@ -799,13 +800,12 @@ class StackdriverUpsertNotificationChannelOperator(BaseOperator):
         self,
         *,
         channels: str,
-        retry: Union[Retry, _MethodDefault] = DEFAULT,
-        timeout: Optional[float] = None,
-        metadata: Sequence[Tuple[str, str]] = (),
-        gcp_conn_id: str = 'google_cloud_default',
-        project_id: Optional[str] = None,
-        delegate_to: Optional[str] = None,
-        impersonation_chain: Optional[Union[str, Sequence[str]]] = None,
+        retry: Retry | _MethodDefault = DEFAULT,
+        timeout: float | None = None,
+        metadata: Sequence[tuple[str, str]] = (),
+        gcp_conn_id: str = "google_cloud_default",
+        project_id: str | None = None,
+        impersonation_chain: str | Sequence[str] | None = None,
         **kwargs,
     ) -> None:
         super().__init__(**kwargs)
@@ -815,18 +815,16 @@ class StackdriverUpsertNotificationChannelOperator(BaseOperator):
         self.metadata = metadata
         self.gcp_conn_id = gcp_conn_id
         self.project_id = project_id
-        self.delegate_to = delegate_to
         self.impersonation_chain = impersonation_chain
-        self.hook: Optional[StackdriverHook] = None
+        self.hook: StackdriverHook | None = None
 
-    def execute(self, context: 'Context'):
+    def execute(self, context: Context):
         self.log.info(
-            'Upsert Notification Channels: Channels: %s Project id: %s', self.channels, self.project_id
+            "Upsert Notification Channels: Channels: %s Project id: %s", self.channels, self.project_id
         )
         if self.hook is None:
             self.hook = StackdriverHook(
                 gcp_conn_id=self.gcp_conn_id,
-                delegate_to=self.delegate_to,
                 impersonation_chain=self.impersonation_chain,
             )
         self.hook.upsert_channel(
@@ -836,9 +834,14 @@ class StackdriverUpsertNotificationChannelOperator(BaseOperator):
             timeout=self.timeout,
             metadata=self.metadata,
         )
+        StackdriverNotificationsLink.persist(
+            context=context,
+            operator_instance=self,
+            project_id=self.project_id or self.hook.project_id,
+        )
 
 
-class StackdriverDeleteNotificationChannelOperator(BaseOperator):
+class StackdriverDeleteNotificationChannelOperator(GoogleCloudBaseOperator):
     """
     Deletes a notification channel.
 
@@ -857,9 +860,6 @@ class StackdriverDeleteNotificationChannelOperator(BaseOperator):
     :param gcp_conn_id: (Optional) The connection ID used to connect to Google
         Cloud Platform.
     :param project_id: The project from which notification channel needs to be deleted.
-    :param delegate_to: The account to impersonate using domain-wide delegation of authority,
-        if any. For this to work, the service account making the request must have
-        domain-wide delegation enabled.
     :param impersonation_chain: Optional service account to impersonate using short-term
         credentials, or chained list of accounts required to get the access_token
         of the last account in the list, which will be impersonated in the request.
@@ -871,8 +871,8 @@ class StackdriverDeleteNotificationChannelOperator(BaseOperator):
     """
 
     template_fields: Sequence[str] = (
-        'name',
-        'impersonation_chain',
+        "name",
+        "impersonation_chain",
     )
 
     ui_color = "#e5ffcc"
@@ -881,13 +881,12 @@ class StackdriverDeleteNotificationChannelOperator(BaseOperator):
         self,
         *,
         name: str,
-        retry: Union[Retry, _MethodDefault] = DEFAULT,
-        timeout: Optional[float] = None,
-        metadata: Sequence[Tuple[str, str]] = (),
-        gcp_conn_id: str = 'google_cloud_default',
-        project_id: Optional[str] = None,
-        delegate_to: Optional[str] = None,
-        impersonation_chain: Optional[Union[str, Sequence[str]]] = None,
+        retry: Retry | _MethodDefault = DEFAULT,
+        timeout: float | None = None,
+        metadata: Sequence[tuple[str, str]] = (),
+        gcp_conn_id: str = "google_cloud_default",
+        project_id: str | None = None,
+        impersonation_chain: str | Sequence[str] | None = None,
         **kwargs,
     ) -> None:
         super().__init__(**kwargs)
@@ -897,16 +896,14 @@ class StackdriverDeleteNotificationChannelOperator(BaseOperator):
         self.metadata = metadata
         self.gcp_conn_id = gcp_conn_id
         self.project_id = project_id
-        self.delegate_to = delegate_to
         self.impersonation_chain = impersonation_chain
-        self.hook: Optional[StackdriverHook] = None
+        self.hook: StackdriverHook | None = None
 
-    def execute(self, context: 'Context'):
-        self.log.info('Delete Notification Channel: Project id: %s Name: %s', self.project_id, self.name)
+    def execute(self, context: Context):
+        self.log.info("Delete Notification Channel: Project id: %s Name: %s", self.project_id, self.name)
         if self.hook is None:
             self.hook = StackdriverHook(
                 gcp_conn_id=self.gcp_conn_id,
-                delegate_to=self.delegate_to,
                 impersonation_chain=self.impersonation_chain,
             )
         self.hook.delete_notification_channel(

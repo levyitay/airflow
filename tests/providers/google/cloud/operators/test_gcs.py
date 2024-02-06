@@ -15,11 +15,18 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
+from __future__ import annotations
 
-import unittest
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from unittest import mock
+
+from openlineage.client.facet import (
+    LifecycleStateChange,
+    LifecycleStateChangeDatasetFacet,
+    LifecycleStateChangeDatasetFacetPreviousIdentifier,
+)
+from openlineage.client.run import Dataset
 
 from airflow.providers.google.cloud.operators.gcs import (
     GCSBucketCreateAclEntryOperator,
@@ -38,13 +45,14 @@ TEST_BUCKET = "test-bucket"
 TEST_PROJECT = "test-project"
 DELIMITER = ".csv"
 PREFIX = "TEST"
-MOCK_FILES = ["TEST1.csv", "TEST2.csv", "TEST3.csv"]
+PREFIX_2 = "TEST2"
+MOCK_FILES = ["TEST1.csv", "TEST2.csv", "TEST3.csv", "OTHERTEST1.csv"]
 TEST_OBJECT = "dir1/test-object"
 LOCAL_FILE_PATH = "/home/airflow/gcp/test-object"
 IMPERSONATION_CHAIN = ["ACCOUNT_1", "ACCOUNT_2", "ACCOUNT_3"]
 
 
-class TestGoogleCloudStorageCreateBucket(unittest.TestCase):
+class TestGoogleCloudStorageCreateBucket:
     @mock.patch("airflow.providers.google.cloud.operators.gcs.GCSHook")
     def test_execute(self, mock_hook):
         operator = GCSCreateBucketOperator(
@@ -57,7 +65,7 @@ class TestGoogleCloudStorageCreateBucket(unittest.TestCase):
             project_id=TEST_PROJECT,
         )
 
-        operator.execute(None)
+        operator.execute(context=mock.MagicMock())
         mock_hook.return_value.create_bucket.assert_called_once_with(
             bucket_name=TEST_BUCKET,
             storage_class="MULTI_REGIONAL",
@@ -68,7 +76,7 @@ class TestGoogleCloudStorageCreateBucket(unittest.TestCase):
         )
 
 
-class TestGoogleCloudStorageAcl(unittest.TestCase):
+class TestGoogleCloudStorageAcl:
     @mock.patch("airflow.providers.google.cloud.operators.gcs.GCSHook")
     def test_bucket_create_acl(self, mock_hook):
         operator = GCSBucketCreateAclEntryOperator(
@@ -78,7 +86,7 @@ class TestGoogleCloudStorageAcl(unittest.TestCase):
             user_project="test-user-project",
             task_id="id",
         )
-        operator.execute(None)
+        operator.execute(context=mock.MagicMock())
         mock_hook.return_value.insert_bucket_acl.assert_called_once_with(
             bucket_name="test-bucket",
             entity="test-entity",
@@ -97,7 +105,7 @@ class TestGoogleCloudStorageAcl(unittest.TestCase):
             user_project="test-user-project",
             task_id="id",
         )
-        operator.execute(None)
+        operator.execute(context=mock.MagicMock())
         mock_hook.return_value.insert_object_acl.assert_called_once_with(
             bucket_name="test-bucket",
             object_name="test-object",
@@ -108,7 +116,7 @@ class TestGoogleCloudStorageAcl(unittest.TestCase):
         )
 
 
-class TestGoogleCloudStorageDeleteOperator(unittest.TestCase):
+class TestGCSDeleteObjectsOperator:
     @mock.patch("airflow.providers.google.cloud.operators.gcs.GCSHook")
     def test_delete_objects(self, mock_hook):
         operator = GCSDeleteObjectsOperator(task_id=TASK_ID, bucket_name=TEST_BUCKET, objects=MOCK_FILES[0:2])
@@ -124,8 +132,16 @@ class TestGoogleCloudStorageDeleteOperator(unittest.TestCase):
         )
 
     @mock.patch("airflow.providers.google.cloud.operators.gcs.GCSHook")
+    def test_delete_empty_list_of_objects(self, mock_hook):
+        operator = GCSDeleteObjectsOperator(task_id=TASK_ID, bucket_name=TEST_BUCKET, objects=[])
+
+        operator.execute(None)
+        mock_hook.return_value.list.assert_not_called()
+        mock_hook.return_value.delete.assert_not_called()
+
+    @mock.patch("airflow.providers.google.cloud.operators.gcs.GCSHook")
     def test_delete_prefix(self, mock_hook):
-        mock_hook.return_value.list.return_value = MOCK_FILES[1:3]
+        mock_hook.return_value.list.return_value = MOCK_FILES[1:4]
         operator = GCSDeleteObjectsOperator(task_id=TASK_ID, bucket_name=TEST_BUCKET, prefix=PREFIX)
 
         operator.execute(None)
@@ -138,29 +154,98 @@ class TestGoogleCloudStorageDeleteOperator(unittest.TestCase):
             any_order=True,
         )
 
-
-class TestGoogleCloudStorageListOperator(unittest.TestCase):
     @mock.patch("airflow.providers.google.cloud.operators.gcs.GCSHook")
-    def test_execute(self, mock_hook):
-        mock_hook.return_value.list.return_value = MOCK_FILES
+    def test_delete_prefix_as_empty_string(self, mock_hook):
+        mock_hook.return_value.list.return_value = MOCK_FILES[0:4]
+        operator = GCSDeleteObjectsOperator(task_id=TASK_ID, bucket_name=TEST_BUCKET, prefix="")
 
+        operator.execute(None)
+        mock_hook.return_value.list.assert_called_once_with(bucket_name=TEST_BUCKET, prefix="")
+        mock_hook.return_value.delete.assert_has_calls(
+            calls=[
+                mock.call(bucket_name=TEST_BUCKET, object_name=MOCK_FILES[0]),
+                mock.call(bucket_name=TEST_BUCKET, object_name=MOCK_FILES[1]),
+                mock.call(bucket_name=TEST_BUCKET, object_name=MOCK_FILES[2]),
+                mock.call(bucket_name=TEST_BUCKET, object_name=MOCK_FILES[3]),
+            ],
+            any_order=True,
+        )
+
+    @mock.patch("airflow.providers.google.cloud.operators.gcs.GCSHook")
+    def test_get_openlineage_facets_on_complete(self, mock_hook):
+        bucket_url = f"gs://{TEST_BUCKET}"
+        expected_inputs = [
+            Dataset(
+                namespace=bucket_url,
+                name="folder/a.txt",
+                facets={
+                    "lifecycleStateChange": LifecycleStateChangeDatasetFacet(
+                        lifecycleStateChange=LifecycleStateChange.DROP.value,
+                        previousIdentifier=LifecycleStateChangeDatasetFacetPreviousIdentifier(
+                            namespace=bucket_url,
+                            name="folder/a.txt",
+                        ),
+                    )
+                },
+            ),
+            Dataset(
+                namespace=bucket_url,
+                name="b.txt",
+                facets={
+                    "lifecycleStateChange": LifecycleStateChangeDatasetFacet(
+                        lifecycleStateChange=LifecycleStateChange.DROP.value,
+                        previousIdentifier=LifecycleStateChangeDatasetFacetPreviousIdentifier(
+                            namespace=bucket_url,
+                            name="b.txt",
+                        ),
+                    )
+                },
+            ),
+        ]
+
+        operator = GCSDeleteObjectsOperator(
+            task_id=TASK_ID, bucket_name=TEST_BUCKET, objects=["folder/a.txt", "b.txt"]
+        )
+
+        operator.execute(None)
+
+        lineage = operator.get_openlineage_facets_on_complete(None)
+        assert len(lineage.inputs) == 2
+        assert len(lineage.outputs) == 0
+        assert lineage.inputs == expected_inputs
+
+
+class TestGoogleCloudStorageListOperator:
+    @mock.patch("airflow.providers.google.cloud.operators.gcs.GCSHook")
+    def test_execute__delimiter(self, mock_hook):
+        mock_hook.return_value.list.return_value = MOCK_FILES
         operator = GCSListObjectsOperator(
             task_id=TASK_ID, bucket=TEST_BUCKET, prefix=PREFIX, delimiter=DELIMITER
         )
-
-        files = operator.execute(None)
+        files = operator.execute(context=mock.MagicMock())
         mock_hook.return_value.list.assert_called_once_with(
-            bucket_name=TEST_BUCKET, prefix=PREFIX, delimiter=DELIMITER
+            bucket_name=TEST_BUCKET, prefix=PREFIX, delimiter=DELIMITER, match_glob=None
+        )
+        assert sorted(files) == sorted(MOCK_FILES)
+
+    @mock.patch("airflow.providers.google.cloud.operators.gcs.GCSHook")
+    def test_execute__match_glob(self, mock_hook):
+        mock_hook.return_value.list.return_value = MOCK_FILES
+        operator = GCSListObjectsOperator(
+            task_id=TASK_ID, bucket=TEST_BUCKET, prefix=PREFIX, match_glob=f"**/*{DELIMITER}", delimiter=None
+        )
+        files = operator.execute(context=mock.MagicMock())
+        mock_hook.return_value.list.assert_called_once_with(
+            bucket_name=TEST_BUCKET, prefix=PREFIX, match_glob=f"**/*{DELIMITER}", delimiter=None
         )
         assert sorted(files) == sorted(MOCK_FILES)
 
 
-class TestGCSFileTransformOperator(unittest.TestCase):
+class TestGCSFileTransformOperator:
     @mock.patch("airflow.providers.google.cloud.operators.gcs.NamedTemporaryFile")
     @mock.patch("airflow.providers.google.cloud.operators.gcs.subprocess")
     @mock.patch("airflow.providers.google.cloud.operators.gcs.GCSHook")
     def test_execute(self, mock_hook, mock_subprocess, mock_tempfile):
-
         source_bucket = TEST_BUCKET
         source_object = "test.txt"
         destination_bucket = TEST_BUCKET + "-dest"
@@ -197,7 +282,7 @@ class TestGCSFileTransformOperator(unittest.TestCase):
             destination_bucket=destination_bucket,
             transform_script=transform_script,
         )
-        op.execute(None)
+        op.execute(context=mock.MagicMock())
 
         mock_hook.return_value.download.assert_called_once_with(
             bucket_name=source_bucket, object_name=source_object, filename=source
@@ -216,8 +301,33 @@ class TestGCSFileTransformOperator(unittest.TestCase):
             filename=destination,
         )
 
+    def test_get_openlineage_facets_on_start(self):
+        expected_input = Dataset(
+            namespace=f"gs://{TEST_BUCKET}",
+            name="folder/a.txt",
+        )
+        expected_output = Dataset(
+            namespace=f"gs://{TEST_BUCKET}2",
+            name="b.txt",
+        )
 
-class TestGCSTimeSpanFileTransformOperatorDateInterpolation(unittest.TestCase):
+        operator = GCSFileTransformOperator(
+            task_id=TASK_ID,
+            source_bucket=TEST_BUCKET,
+            source_object="folder/a.txt",
+            destination_bucket=f"{TEST_BUCKET}2",
+            destination_object="b.txt",
+            transform_script="/path/to_script",
+        )
+
+        lineage = operator.get_openlineage_facets_on_start()
+        assert len(lineage.inputs) == 1
+        assert len(lineage.outputs) == 1
+        assert lineage.inputs[0] == expected_input
+        assert lineage.outputs[0] == expected_output
+
+
+class TestGCSTimeSpanFileTransformOperatorDateInterpolation:
     def test_execute(self):
         interp_dt = datetime(2015, 2, 1, 15, 16, 17, 345, tzinfo=timezone.utc)
 
@@ -248,7 +358,7 @@ class TestGCSTimeSpanFileTransformOperatorDateInterpolation(unittest.TestCase):
         )
 
 
-class TestGCSTimeSpanFileTransformOperator(unittest.TestCase):
+class TestGCSTimeSpanFileTransformOperator:
     @mock.patch("airflow.providers.google.cloud.operators.gcs.TemporaryDirectory")
     @mock.patch("airflow.providers.google.cloud.operators.gcs.subprocess")
     @mock.patch("airflow.providers.google.cloud.operators.gcs.GCSHook")
@@ -273,9 +383,11 @@ class TestGCSTimeSpanFileTransformOperator(unittest.TestCase):
         timespan_end = timespan_start + timedelta(hours=1)
         mock_dag = mock.Mock()
         mock_dag.following_schedule = lambda x: x + timedelta(hours=1)
+        mock_ti = mock.Mock()
         context = dict(
             execution_date=timespan_start,
             dag=mock_dag,
+            ti=mock_ti,
         )
 
         mock_tempdir.return_value.__enter__.side_effect = [source, destination]
@@ -306,7 +418,7 @@ class TestGCSTimeSpanFileTransformOperator(unittest.TestCase):
             transform_script=transform_script,
         )
 
-        with mock.patch.object(Path, 'glob') as path_glob:
+        with mock.patch.object(Path, "glob") as path_glob:
             path_glob.return_value.__iter__.return_value = [
                 Path(f"{destination}/{file1}"),
                 Path(f"{destination}/{file2}"),
@@ -371,18 +483,105 @@ class TestGCSTimeSpanFileTransformOperator(unittest.TestCase):
             ]
         )
 
+    @mock.patch("airflow.providers.google.cloud.operators.gcs.TemporaryDirectory")
+    @mock.patch("airflow.providers.google.cloud.operators.gcs.subprocess")
+    @mock.patch("airflow.providers.google.cloud.operators.gcs.GCSHook")
+    def test_get_openlineage_facets_on_complete(self, mock_hook, mock_subprocess, mock_tempdir):
+        source_bucket = TEST_BUCKET
+        source_prefix = "source_prefix"
 
-class TestGCSDeleteBucketOperator(unittest.TestCase):
+        destination_bucket = TEST_BUCKET + "_dest"
+        destination_prefix = "destination_prefix"
+        destination = "destination"
+
+        file1 = "file1"
+        file2 = "file2"
+
+        timespan_start = datetime(2015, 2, 1, 15, 16, 17, 345, tzinfo=timezone.utc)
+        mock_dag = mock.Mock()
+        mock_dag.following_schedule = lambda x: x + timedelta(hours=1)
+        context = dict(
+            execution_date=timespan_start,
+            dag=mock_dag,
+            ti=mock.Mock(),
+        )
+
+        mock_tempdir.return_value.__enter__.side_effect = ["source", destination]
+        mock_hook.return_value.list_by_timespan.return_value = [
+            f"{source_prefix}/{file1}",
+            f"{source_prefix}/{file2}",
+        ]
+
+        mock_proc = mock.MagicMock()
+        mock_proc.returncode = 0
+        mock_proc.stdout.readline = lambda: b""
+        mock_proc.wait.return_value = None
+        mock_popen = mock.MagicMock()
+        mock_popen.return_value.__enter__.return_value = mock_proc
+
+        mock_subprocess.Popen = mock_popen
+        mock_subprocess.PIPE = "pipe"
+        mock_subprocess.STDOUT = "stdout"
+
+        op = GCSTimeSpanFileTransformOperator(
+            task_id=TASK_ID,
+            source_bucket=source_bucket,
+            source_prefix=source_prefix,
+            source_gcp_conn_id="",
+            destination_bucket=destination_bucket,
+            destination_prefix=destination_prefix,
+            destination_gcp_conn_id="",
+            transform_script="script.py",
+        )
+
+        with mock.patch.object(Path, "glob") as path_glob:
+            path_glob.return_value.__iter__.return_value = [
+                Path(f"{destination}/{file1}"),
+                Path(f"{destination}/{file2}"),
+            ]
+            op.execute(context=context)
+
+        expected_inputs = [
+            Dataset(
+                namespace=f"gs://{source_bucket}",
+                name=f"{source_prefix}/{file1}",
+            ),
+            Dataset(
+                namespace=f"gs://{source_bucket}",
+                name=f"{source_prefix}/{file2}",
+            ),
+        ]
+        expected_outputs = [
+            Dataset(
+                namespace=f"gs://{destination_bucket}",
+                name=f"{destination_prefix}/{file1}",
+            ),
+            Dataset(
+                namespace=f"gs://{destination_bucket}",
+                name=f"{destination_prefix}/{file2}",
+            ),
+        ]
+
+        lineage = op.get_openlineage_facets_on_complete(None)
+        assert len(lineage.inputs) == 2
+        assert len(lineage.outputs) == 2
+        assert lineage.inputs == expected_inputs
+        assert lineage.outputs == expected_outputs
+
+
+class TestGCSDeleteBucketOperator:
     @mock.patch("airflow.providers.google.cloud.operators.gcs.GCSHook")
     def test_delete_bucket(self, mock_hook):
         operator = GCSDeleteBucketOperator(task_id=TASK_ID, bucket_name=TEST_BUCKET)
 
         operator.execute(None)
-        mock_hook.return_value.delete_bucket.assert_called_once_with(bucket_name=TEST_BUCKET, force=True)
+        mock_hook.return_value.delete_bucket.assert_called_once_with(
+            bucket_name=TEST_BUCKET, force=True, user_project=None
+        )
 
 
-class TestGoogleCloudStorageSync(unittest.TestCase):
-    @mock.patch('airflow.providers.google.cloud.operators.gcs.GCSHook')
+class TestGoogleCloudStorageSync:
+    @mock.patch("airflow.providers.google.cloud.operators.gcs.GCSHook")
     def test_execute(self, mock_hook):
         task = GCSSynchronizeBucketsOperator(
             task_id="task-id",
@@ -394,20 +593,18 @@ class TestGoogleCloudStorageSync(unittest.TestCase):
             delete_extra_files=True,
             allow_overwrite=True,
             gcp_conn_id="GCP_CONN_ID",
-            delegate_to="DELEGATE_TO",
             impersonation_chain=IMPERSONATION_CHAIN,
         )
-        task.execute({})
+        task.execute(context=mock.MagicMock())
         mock_hook.assert_called_once_with(
-            gcp_conn_id='GCP_CONN_ID',
-            delegate_to='DELEGATE_TO',
+            gcp_conn_id="GCP_CONN_ID",
             impersonation_chain=IMPERSONATION_CHAIN,
         )
         mock_hook.return_value.sync.assert_called_once_with(
-            source_bucket='SOURCE_BUCKET',
-            source_object='SOURCE_OBJECT',
-            destination_bucket='DESTINATION_BUCKET',
-            destination_object='DESTINATION_OBJECT',
+            source_bucket="SOURCE_BUCKET",
+            source_object="SOURCE_OBJECT",
+            destination_bucket="DESTINATION_BUCKET",
+            destination_object="DESTINATION_OBJECT",
             delete_extra_files=True,
             recursive=True,
             allow_overwrite=True,

@@ -14,10 +14,12 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
+from __future__ import annotations
+
 import datetime
 from unittest import mock
 
-import pytz
+from google.protobuf.timestamp_pb2 import Timestamp
 
 from airflow.providers.google.cloud.operators.workflows import (
     WorkflowsCancelExecutionOperator,
@@ -64,7 +66,8 @@ class TestWorkflowsCreateWorkflowOperator:
             gcp_conn_id=GCP_CONN_ID,
             impersonation_chain=IMPERSONATION_CHAIN,
         )
-        result = op.execute({})
+        context = mock.MagicMock()
+        result = op.execute(context=context)
 
         mock_hook.assert_called_once_with(
             gcp_conn_id=GCP_CONN_ID,
@@ -100,7 +103,8 @@ class TestWorkflowsUpdateWorkflowOperator:
             gcp_conn_id=GCP_CONN_ID,
             impersonation_chain=IMPERSONATION_CHAIN,
         )
-        result = op.execute({})
+        context = mock.MagicMock()
+        result = op.execute(context=context)
 
         mock_hook.assert_called_once_with(
             gcp_conn_id=GCP_CONN_ID,
@@ -165,8 +169,12 @@ class TestWorkflowsListWorkflowsOperator:
     @mock.patch(BASE_PATH.format("Workflow"))
     @mock.patch(BASE_PATH.format("WorkflowsHook"))
     def test_execute(self, mock_hook, mock_object):
+        timestamp = Timestamp()
+        timestamp.FromDatetime(
+            datetime.datetime.now(tz=datetime.timezone.utc) + datetime.timedelta(minutes=5)
+        )
         workflow_mock = mock.MagicMock()
-        workflow_mock.start_time = datetime.datetime.now(tz=pytz.UTC) + datetime.timedelta(minutes=5)
+        workflow_mock.start_time = timestamp
         mock_hook.return_value.list_workflows.return_value = [workflow_mock]
 
         op = WorkflowsListWorkflowsOperator(
@@ -181,7 +189,8 @@ class TestWorkflowsListWorkflowsOperator:
             gcp_conn_id=GCP_CONN_ID,
             impersonation_chain=IMPERSONATION_CHAIN,
         )
-        result = op.execute({})
+        context = mock.MagicMock()
+        result = op.execute(context=context)
 
         mock_hook.assert_called_once_with(
             gcp_conn_id=GCP_CONN_ID,
@@ -216,7 +225,8 @@ class TestWorkflowsGetWorkflowOperator:
             gcp_conn_id=GCP_CONN_ID,
             impersonation_chain=IMPERSONATION_CHAIN,
         )
-        result = op.execute({})
+        context = mock.MagicMock()
+        result = op.execute(context=context)
 
         mock_hook.assert_called_once_with(
             gcp_conn_id=GCP_CONN_ID,
@@ -253,7 +263,8 @@ class TestWorkflowExecutionsCreateExecutionOperator:
             gcp_conn_id=GCP_CONN_ID,
             impersonation_chain=IMPERSONATION_CHAIN,
         )
-        result = op.execute({})
+        context = mock.MagicMock()
+        result = op.execute(context=context)
 
         mock_hook.assert_called_once_with(
             gcp_conn_id=GCP_CONN_ID,
@@ -269,7 +280,16 @@ class TestWorkflowExecutionsCreateExecutionOperator:
             timeout=TIMEOUT,
             metadata=METADATA,
         )
-        mock_xcom.assert_called_once_with({}, key="execution_id", value="execution_id")
+        mock_xcom.assert_called_with(
+            context,
+            key="workflow_execution",
+            value={
+                "location_id": LOCATION,
+                "workflow_id": WORKFLOW_ID,
+                "execution_id": EXECUTION_ID,
+                "project_id": PROJECT_ID,
+            },
+        )
         assert result == mock_object.to_dict.return_value
 
 
@@ -289,7 +309,8 @@ class TestWorkflowExecutionsCancelExecutionOperator:
             gcp_conn_id=GCP_CONN_ID,
             impersonation_chain=IMPERSONATION_CHAIN,
         )
-        result = op.execute({})
+        context = mock.MagicMock()
+        result = op.execute(context=context)
 
         mock_hook.assert_called_once_with(
             gcp_conn_id=GCP_CONN_ID,
@@ -313,8 +334,9 @@ class TestWorkflowExecutionsListExecutionsOperator:
     @mock.patch(BASE_PATH.format("Execution"))
     @mock.patch(BASE_PATH.format("WorkflowsHook"))
     def test_execute(self, mock_hook, mock_object):
+        start_date_filter = datetime.datetime.now(tz=datetime.timezone.utc) + datetime.timedelta(minutes=5)
         execution_mock = mock.MagicMock()
-        execution_mock.start_time = datetime.datetime.now(tz=pytz.UTC) + datetime.timedelta(minutes=5)
+        execution_mock.start_time = start_date_filter
         mock_hook.return_value.list_executions.return_value = [execution_mock]
 
         op = WorkflowsListExecutionsOperator(
@@ -328,7 +350,8 @@ class TestWorkflowExecutionsListExecutionsOperator:
             gcp_conn_id=GCP_CONN_ID,
             impersonation_chain=IMPERSONATION_CHAIN,
         )
-        result = op.execute({})
+        context = mock.MagicMock()
+        result = op.execute(context=context)
 
         mock_hook.assert_called_once_with(
             gcp_conn_id=GCP_CONN_ID,
@@ -363,7 +386,8 @@ class TestWorkflowExecutionsGetExecutionOperator:
             gcp_conn_id=GCP_CONN_ID,
             impersonation_chain=IMPERSONATION_CHAIN,
         )
-        result = op.execute({})
+        context = mock.MagicMock()
+        result = op.execute(context=context)
 
         mock_hook.assert_called_once_with(
             gcp_conn_id=GCP_CONN_ID,

@@ -15,6 +15,7 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
+from __future__ import annotations
 
 import contextlib
 import os
@@ -28,7 +29,6 @@ def conf_vars(overrides):
     original = {}
     original_env_vars = {}
     for (section, key), value in overrides.items():
-
         env = conf._env_var_name(section, key)
         if env in os.environ:
             original_env_vars[env] = os.environ.pop(env)
@@ -70,7 +70,7 @@ def env_vars(overrides):
     new_vars = []
     for env, value in overrides.items():
         if env in os.environ:
-            orig_vars[env] = os.environ.pop(env, '')
+            orig_vars[env] = os.environ.pop(env, "")
         else:
             new_vars.append(env)
         os.environ[env] = value

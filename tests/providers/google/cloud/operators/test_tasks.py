@@ -15,8 +15,8 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
+from __future__ import annotations
 
-import unittest
 from unittest import mock
 
 from google.api_core.gapic_v1.method import DEFAULT
@@ -50,15 +50,15 @@ TEST_QUEUE = Queue(name=FULL_QUEUE_PATH)
 TEST_TASK = Task(app_engine_http_request={})
 
 
-class TestCloudTasksQueueCreate(unittest.TestCase):
+class TestCloudTasksQueueCreate:
     @mock.patch("airflow.providers.google.cloud.operators.tasks.CloudTasksHook")
     def test_create_queue(self, mock_hook):
         mock_hook.return_value.create_queue.return_value = TEST_QUEUE
         operator = CloudTasksQueueCreateOperator(location=LOCATION, task_queue=TEST_QUEUE, task_id="id")
 
-        result = operator.execute(context=None)
+        result = operator.execute(context=mock.MagicMock())
 
-        assert {'name': FULL_QUEUE_PATH, 'state': 0} == result
+        assert {"name": FULL_QUEUE_PATH, "state": 0} == result
         mock_hook.assert_called_once_with(
             gcp_conn_id=GCP_CONN_ID,
             impersonation_chain=None,
@@ -74,15 +74,15 @@ class TestCloudTasksQueueCreate(unittest.TestCase):
         )
 
 
-class TestCloudTasksQueueUpdate(unittest.TestCase):
+class TestCloudTasksQueueUpdate:
     @mock.patch("airflow.providers.google.cloud.operators.tasks.CloudTasksHook")
     def test_update_queue(self, mock_hook):
         mock_hook.return_value.update_queue.return_value = TEST_QUEUE
         operator = CloudTasksQueueUpdateOperator(task_queue=Queue(name=FULL_QUEUE_PATH), task_id="id")
 
-        result = operator.execute(context=None)
+        result = operator.execute(context=mock.MagicMock())
 
-        assert {'name': FULL_QUEUE_PATH, 'state': 0} == result
+        assert {"name": FULL_QUEUE_PATH, "state": 0} == result
         mock_hook.assert_called_once_with(
             gcp_conn_id=GCP_CONN_ID,
             impersonation_chain=None,
@@ -99,15 +99,15 @@ class TestCloudTasksQueueUpdate(unittest.TestCase):
         )
 
 
-class TestCloudTasksQueueGet(unittest.TestCase):
+class TestCloudTasksQueueGet:
     @mock.patch("airflow.providers.google.cloud.operators.tasks.CloudTasksHook")
     def test_get_queue(self, mock_hook):
         mock_hook.return_value.get_queue.return_value = TEST_QUEUE
         operator = CloudTasksQueueGetOperator(location=LOCATION, queue_name=QUEUE_ID, task_id="id")
 
-        result = operator.execute(context=None)
+        result = operator.execute(context=mock.MagicMock())
 
-        assert {'name': FULL_QUEUE_PATH, 'state': 0} == result
+        assert {"name": FULL_QUEUE_PATH, "state": 0} == result
         mock_hook.assert_called_once_with(
             gcp_conn_id=GCP_CONN_ID,
             impersonation_chain=None,
@@ -122,15 +122,15 @@ class TestCloudTasksQueueGet(unittest.TestCase):
         )
 
 
-class TestCloudTasksQueuesList(unittest.TestCase):
+class TestCloudTasksQueuesList:
     @mock.patch("airflow.providers.google.cloud.operators.tasks.CloudTasksHook")
     def test_list_queues(self, mock_hook):
         mock_hook.return_value.list_queues.return_value = [TEST_QUEUE]
         operator = CloudTasksQueuesListOperator(location=LOCATION, task_id="id")
 
-        result = operator.execute(context=None)
+        result = operator.execute(context=mock.MagicMock())
 
-        assert [{'name': FULL_QUEUE_PATH, 'state': 0}] == result
+        assert [{"name": FULL_QUEUE_PATH, "state": 0}] == result
         mock_hook.assert_called_once_with(
             gcp_conn_id=GCP_CONN_ID,
             impersonation_chain=None,
@@ -146,13 +146,13 @@ class TestCloudTasksQueuesList(unittest.TestCase):
         )
 
 
-class TestCloudTasksQueueDelete(unittest.TestCase):
+class TestCloudTasksQueueDelete:
     @mock.patch("airflow.providers.google.cloud.operators.tasks.CloudTasksHook")
     def test_delete_queue(self, mock_hook):
         mock_hook.return_value.delete_queue.return_value = None
         operator = CloudTasksQueueDeleteOperator(location=LOCATION, queue_name=QUEUE_ID, task_id="id")
 
-        operator.execute(context=None)
+        operator.execute(context=mock.MagicMock())
 
         mock_hook.assert_called_once_with(
             gcp_conn_id=GCP_CONN_ID,
@@ -168,15 +168,15 @@ class TestCloudTasksQueueDelete(unittest.TestCase):
         )
 
 
-class TestCloudTasksQueuePurge(unittest.TestCase):
+class TestCloudTasksQueuePurge:
     @mock.patch("airflow.providers.google.cloud.operators.tasks.CloudTasksHook")
     def test_delete_queue(self, mock_hook):
         mock_hook.return_value.purge_queue.return_value = TEST_QUEUE
         operator = CloudTasksQueuePurgeOperator(location=LOCATION, queue_name=QUEUE_ID, task_id="id")
 
-        result = operator.execute(context=None)
+        result = operator.execute(context=mock.MagicMock())
 
-        assert {'name': FULL_QUEUE_PATH, 'state': 0} == result
+        assert {"name": FULL_QUEUE_PATH, "state": 0} == result
         mock_hook.assert_called_once_with(
             gcp_conn_id=GCP_CONN_ID,
             impersonation_chain=None,
@@ -191,15 +191,15 @@ class TestCloudTasksQueuePurge(unittest.TestCase):
         )
 
 
-class TestCloudTasksQueuePause(unittest.TestCase):
+class TestCloudTasksQueuePause:
     @mock.patch("airflow.providers.google.cloud.operators.tasks.CloudTasksHook")
     def test_pause_queue(self, mock_hook):
         mock_hook.return_value.pause_queue.return_value = TEST_QUEUE
         operator = CloudTasksQueuePauseOperator(location=LOCATION, queue_name=QUEUE_ID, task_id="id")
 
-        result = operator.execute(context=None)
+        result = operator.execute(context=mock.MagicMock())
 
-        assert {'name': FULL_QUEUE_PATH, 'state': 0} == result
+        assert {"name": FULL_QUEUE_PATH, "state": 0} == result
         mock_hook.assert_called_once_with(
             gcp_conn_id=GCP_CONN_ID,
             impersonation_chain=None,
@@ -214,15 +214,15 @@ class TestCloudTasksQueuePause(unittest.TestCase):
         )
 
 
-class TestCloudTasksQueueResume(unittest.TestCase):
+class TestCloudTasksQueueResume:
     @mock.patch("airflow.providers.google.cloud.operators.tasks.CloudTasksHook")
     def test_resume_queue(self, mock_hook):
         mock_hook.return_value.resume_queue.return_value = TEST_QUEUE
         operator = CloudTasksQueueResumeOperator(location=LOCATION, queue_name=QUEUE_ID, task_id="id")
 
-        result = operator.execute(context=None)
+        result = operator.execute(context=mock.MagicMock())
 
-        assert {'name': FULL_QUEUE_PATH, 'state': 0} == result
+        assert {"name": FULL_QUEUE_PATH, "state": 0} == result
         mock_hook.assert_called_once_with(
             gcp_conn_id=GCP_CONN_ID,
             impersonation_chain=None,
@@ -237,7 +237,7 @@ class TestCloudTasksQueueResume(unittest.TestCase):
         )
 
 
-class TestCloudTasksTaskCreate(unittest.TestCase):
+class TestCloudTasksTaskCreate:
     @mock.patch("airflow.providers.google.cloud.operators.tasks.CloudTasksHook")
     def test_create_task(self, mock_hook):
         mock_hook.return_value.create_task.return_value = TEST_TASK
@@ -245,14 +245,14 @@ class TestCloudTasksTaskCreate(unittest.TestCase):
             location=LOCATION, queue_name=QUEUE_ID, task=Task(), task_id="id"
         )
 
-        result = operator.execute(context=None)
+        result = operator.execute(context=mock.MagicMock())
 
         assert {
-            'app_engine_http_request': {'body': '', 'headers': {}, 'http_method': 0, 'relative_uri': ''},
-            'dispatch_count': 0,
-            'name': '',
-            'response_count': 0,
-            'view': 0,
+            "app_engine_http_request": {"body": "", "headers": {}, "http_method": 0, "relative_uri": ""},
+            "dispatch_count": 0,
+            "name": "",
+            "response_count": 0,
+            "view": 0,
         } == result
         mock_hook.assert_called_once_with(
             gcp_conn_id=GCP_CONN_ID,
@@ -271,7 +271,7 @@ class TestCloudTasksTaskCreate(unittest.TestCase):
         )
 
 
-class TestCloudTasksTaskGet(unittest.TestCase):
+class TestCloudTasksTaskGet:
     @mock.patch("airflow.providers.google.cloud.operators.tasks.CloudTasksHook")
     def test_get_task(self, mock_hook):
         mock_hook.return_value.get_task.return_value = TEST_TASK
@@ -279,14 +279,14 @@ class TestCloudTasksTaskGet(unittest.TestCase):
             location=LOCATION, queue_name=QUEUE_ID, task_name=TASK_NAME, task_id="id"
         )
 
-        result = operator.execute(context=None)
+        result = operator.execute(context=mock.MagicMock())
 
         assert {
-            'app_engine_http_request': {'body': '', 'headers': {}, 'http_method': 0, 'relative_uri': ''},
-            'dispatch_count': 0,
-            'name': '',
-            'response_count': 0,
-            'view': 0,
+            "app_engine_http_request": {"body": "", "headers": {}, "http_method": 0, "relative_uri": ""},
+            "dispatch_count": 0,
+            "name": "",
+            "response_count": 0,
+            "view": 0,
         } == result
         mock_hook.assert_called_once_with(
             gcp_conn_id=GCP_CONN_ID,
@@ -304,26 +304,26 @@ class TestCloudTasksTaskGet(unittest.TestCase):
         )
 
 
-class TestCloudTasksTasksList(unittest.TestCase):
+class TestCloudTasksTasksList:
     @mock.patch("airflow.providers.google.cloud.operators.tasks.CloudTasksHook")
     def test_list_tasks(self, mock_hook):
         mock_hook.return_value.list_tasks.return_value = [TEST_TASK]
         operator = CloudTasksTasksListOperator(location=LOCATION, queue_name=QUEUE_ID, task_id="id")
 
-        result = operator.execute(context=None)
+        result = operator.execute(context=mock.MagicMock())
 
         assert [
             {
-                'app_engine_http_request': {
-                    'body': '',
-                    'headers': {},
-                    'http_method': 0,
-                    'relative_uri': '',
+                "app_engine_http_request": {
+                    "body": "",
+                    "headers": {},
+                    "http_method": 0,
+                    "relative_uri": "",
                 },
-                'dispatch_count': 0,
-                'name': '',
-                'response_count': 0,
-                'view': 0,
+                "dispatch_count": 0,
+                "name": "",
+                "response_count": 0,
+                "view": 0,
             }
         ] == result
         mock_hook.assert_called_once_with(
@@ -342,7 +342,7 @@ class TestCloudTasksTasksList(unittest.TestCase):
         )
 
 
-class TestCloudTasksTaskDelete(unittest.TestCase):
+class TestCloudTasksTaskDelete:
     @mock.patch("airflow.providers.google.cloud.operators.tasks.CloudTasksHook")
     def test_delete_task(self, mock_hook):
         mock_hook.return_value.delete_task.return_value = None
@@ -350,7 +350,7 @@ class TestCloudTasksTaskDelete(unittest.TestCase):
             location=LOCATION, queue_name=QUEUE_ID, task_name=TASK_NAME, task_id="id"
         )
 
-        operator.execute(context=None)
+        operator.execute(context=mock.MagicMock())
 
         mock_hook.assert_called_once_with(
             gcp_conn_id=GCP_CONN_ID,
@@ -367,7 +367,7 @@ class TestCloudTasksTaskDelete(unittest.TestCase):
         )
 
 
-class TestCloudTasksTaskRun(unittest.TestCase):
+class TestCloudTasksTaskRun:
     @mock.patch("airflow.providers.google.cloud.operators.tasks.CloudTasksHook")
     def test_run_task(self, mock_hook):
         mock_hook.return_value.run_task.return_value = TEST_TASK
@@ -375,14 +375,14 @@ class TestCloudTasksTaskRun(unittest.TestCase):
             location=LOCATION, queue_name=QUEUE_ID, task_name=TASK_NAME, task_id="id"
         )
 
-        result = operator.execute(context=None)
+        result = operator.execute(context=mock.MagicMock())
 
         assert {
-            'app_engine_http_request': {'body': '', 'headers': {}, 'http_method': 0, 'relative_uri': ''},
-            'dispatch_count': 0,
-            'name': '',
-            'response_count': 0,
-            'view': 0,
+            "app_engine_http_request": {"body": "", "headers": {}, "http_method": 0, "relative_uri": ""},
+            "dispatch_count": 0,
+            "name": "",
+            "response_count": 0,
+            "view": 0,
         } == result
         mock_hook.assert_called_once_with(
             gcp_conn_id=GCP_CONN_ID,

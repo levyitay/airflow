@@ -19,20 +19,36 @@
 ``apache-airflow-providers-singularity``
 ========================================
 
-Content
--------
 
 .. toctree::
+    :hidden:
+    :maxdepth: 1
+    :caption: Basics
+
+    Home <self>
+    Changelog <changelog>
+    Security <security>
+
+.. toctree::
+    :hidden:
     :maxdepth: 1
     :caption: References
 
     Python API <_api/airflow/providers/singularity/index>
 
 .. toctree::
+    :hidden:
+    :maxdepth: 1
+    :caption: System tests
+
+    System Tests <_api/tests/system/providers/singularity/index>
+
+.. toctree::
+    :hidden:
     :maxdepth: 1
     :caption: Resources
 
-    Example DAGs <https://github.com/apache/airflow/tree/main/airflow/providers/singularity/example_dags>
+    Example DAGs <https://github.com/apache/airflow/tree/providers-singularity/|version|/tests/system/providers/singularity/example_singularity.py>
     PyPI Repository <https://pypi.org/project/apache-airflow-providers-singularity/>
     Installing from sources <installing-providers-from-sources>
 
@@ -40,6 +56,7 @@ Content
 
 
 .. toctree::
+    :hidden:
     :maxdepth: 1
     :caption: Commits
 
@@ -52,7 +69,7 @@ Package apache-airflow-providers-singularity
 `Singularity <https://sylabs.io/guides/latest/user-guide/>`__
 
 
-Release: 2.0.4
+Release: 3.4.0
 
 Provider package
 ----------------
@@ -63,17 +80,18 @@ are in ``airflow.providers.singularity`` python package.
 Installation
 ------------
 
-You can install this package on top of an existing Airflow 2.1+ installation via
+You can install this package on top of an existing Airflow 2 installation (see ``Requirements`` below)
+for the minimum Airflow version supported) via
 ``pip install apache-airflow-providers-singularity``
 
-PIP requirements
-----------------
+Requirements
+------------
+
+The minimum Apache Airflow version supported by this provider package is ``2.6.0``.
 
 ==================  ==================
 PIP package         Version required
 ==================  ==================
-``apache-airflow``  ``>=2.1.0``
+``apache-airflow``  ``>=2.6.0``
 ``spython``         ``>=0.0.56``
 ==================  ==================
-
-.. include:: ../../airflow/providers/singularity/CHANGELOG.rst

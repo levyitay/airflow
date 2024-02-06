@@ -15,13 +15,12 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
+from __future__ import annotations
 
-import unittest
-from unittest.mock import ANY, Mock, PropertyMock, patch
+from unittest.mock import ANY, MagicMock, Mock, PropertyMock, patch
 
 import pytest
 from google.api_core.gapic_v1.method import DEFAULT
-from parameterized import parameterized
 
 from airflow.exceptions import AirflowException
 from airflow.providers.google.cloud.operators.text_to_speech import CloudTextToSpeechSynthesizeOperator
@@ -36,12 +35,13 @@ TARGET_BUCKET_NAME = "target_bucket_name"
 TARGET_FILENAME = "target_filename"
 
 
-class TestGcpTextToSpeech(unittest.TestCase):
+class TestGcpTextToSpeech:
     @patch("airflow.providers.google.cloud.operators.text_to_speech.GCSHook")
     @patch("airflow.providers.google.cloud.operators.text_to_speech.CloudTextToSpeechHook")
     def test_synthesize_text_green_path(self, mock_text_to_speech_hook, mock_gcp_hook):
         mocked_response = Mock()
         type(mocked_response).audio_content = PropertyMock(return_value=b"audio")
+        mocked_context = MagicMock()
 
         mock_text_to_speech_hook.return_value.synthesize_speech.return_value = mocked_response
         mock_gcp_hook.return_value.upload.return_value = True
@@ -56,7 +56,7 @@ class TestGcpTextToSpeech(unittest.TestCase):
             target_filename=TARGET_FILENAME,
             task_id="id",
             impersonation_chain=IMPERSONATION_CHAIN,
-        ).execute(context={"task_instance": Mock()})
+        ).execute(context=mocked_context)
 
         mock_text_to_speech_hook.assert_called_once_with(
             gcp_conn_id="gcp-conn-id",
@@ -73,28 +73,31 @@ class TestGcpTextToSpeech(unittest.TestCase):
             bucket_name=TARGET_BUCKET_NAME, object_name=TARGET_FILENAME, filename=ANY
         )
 
-    @parameterized.expand(
+    @pytest.mark.parametrize(
+        "missing_arg, input_data, voice, audio_config, target_bucket_name, target_filename",
         [
             ("input_data", "", VOICE, AUDIO_CONFIG, TARGET_BUCKET_NAME, TARGET_FILENAME),
             ("voice", INPUT, "", AUDIO_CONFIG, TARGET_BUCKET_NAME, TARGET_FILENAME),
             ("audio_config", INPUT, VOICE, "", TARGET_BUCKET_NAME, TARGET_FILENAME),
             ("target_bucket_name", INPUT, VOICE, AUDIO_CONFIG, "", TARGET_FILENAME),
             ("target_filename", INPUT, VOICE, AUDIO_CONFIG, TARGET_BUCKET_NAME, ""),
-        ]
+        ],
     )
     @patch("airflow.providers.google.cloud.operators.text_to_speech.GCSHook")
     @patch("airflow.providers.google.cloud.operators.text_to_speech.CloudTextToSpeechHook")
     def test_missing_arguments(
         self,
+        mock_text_to_speech_hook,
+        mock_gcp_hook,
         missing_arg,
         input_data,
         voice,
         audio_config,
         target_bucket_name,
         target_filename,
-        mock_text_to_speech_hook,
-        mock_gcp_hook,
     ):
+        mocked_context = Mock()
+
         with pytest.raises(AirflowException) as ctx:
             CloudTextToSpeechSynthesizeOperator(
                 project_id="project-id",
@@ -104,7 +107,7 @@ class TestGcpTextToSpeech(unittest.TestCase):
                 target_bucket_name=target_bucket_name,
                 target_filename=target_filename,
                 task_id="id",
-            ).execute(context={"task_instance": Mock()})
+            ).execute(context=mocked_context)
 
         err = ctx.value
         assert missing_arg in str(err)

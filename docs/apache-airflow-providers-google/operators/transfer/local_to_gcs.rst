@@ -24,7 +24,7 @@ This page shows how to upload data from local filesystem to GCS.
 Prerequisite Tasks
 ^^^^^^^^^^^^^^^^^^
 
-.. include::/operators/_partials/prerequisite_tasks.rst
+.. include:: /operators/_partials/prerequisite_tasks.rst
 
 .. _howto/operator:LocalFilesystemToGCSOperator:
 
@@ -38,7 +38,7 @@ When you use this operator, you can optionally compress the data being uploaded.
 
 Below is an example of using this operator to upload a file to GCS.
 
-.. exampleinclude:: /../../airflow/providers/google/cloud/example_dags/example_local_to_gcs.py
+.. exampleinclude:: /../../tests/system/providers/google/cloud/gcs/example_gcs_upload_download.py
     :language: python
     :dedent: 0
     :start-after: [START howto_operator_local_filesystem_to_gcs]

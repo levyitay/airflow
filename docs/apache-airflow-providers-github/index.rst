@@ -19,10 +19,18 @@
 ``apache-airflow-providers-github``
 =======================================
 
-Content
--------
 
 .. toctree::
+    :hidden:
+    :maxdepth: 1
+    :caption: Basics
+
+    Home <self>
+    Changelog <changelog>
+    Security <security>
+
+.. toctree::
+    :hidden:
     :maxdepth: 1
     :caption: Guides
 
@@ -30,31 +38,30 @@ Content
     Operators <operators/index>
 
 .. toctree::
+    :hidden:
     :maxdepth: 1
     :caption: References
 
     Python API <_api/airflow/providers/github/index>
 
 .. toctree::
+    :hidden:
     :maxdepth: 1
-    :caption: Resources
+    :caption: System tests
 
-    Example DAGs <https://github.com/apache/airflow/tree/main/airflow/providers/github/example_dags>
+    System Tests <_api/tests/system/providers/github/index>
 
 .. toctree::
+    :hidden:
     :maxdepth: 1
     :caption: Resources
 
-    PyPI Repository <https://pypi.org/project/apache-airflow-providers-github/>
-
-.. toctree::
-    :maxdepth: 1
-    :caption: Resources
-
+    Example DAGs <https://github.com/apache/airflow/tree/providers-github/|version|/tests/system/providers/github>
     PyPI Repository <https://pypi.org/project/apache-airflow-providers-github/>
     Installing from sources <installing-providers-from-sources>
 
 .. toctree::
+    :hidden:
     :maxdepth: 1
     :caption: Commits
 
@@ -64,6 +71,7 @@ Content
 
 
 .. toctree::
+    :hidden:
     :maxdepth: 1
     :caption: Commits
 
@@ -73,10 +81,10 @@ Content
 Package apache-airflow-providers-github
 ------------------------------------------------------
 
-`Github <https://www.github.com/>`__
+`GitHub <https://www.github.com/>`__
 
 
-Release: 1.0.3
+Release: 2.5.1
 
 Provider package
 ----------------
@@ -87,16 +95,18 @@ are in ``airflow.providers.github`` python package.
 Installation
 ------------
 
-You can install this package on top of an existing Airflow 2.1+ installation via
+You can install this package on top of an existing Airflow 2 installation (see ``Requirements`` below)
+for the minimum Airflow version supported) via
 ``pip install apache-airflow-providers-github``
 
-PIP requirements
-----------------
+Requirements
+------------
 
-=============  ==================
-PIP package    Version required
-=============  ==================
-``pygithub``
-=============  ==================
+The minimum Apache Airflow version supported by this provider package is ``2.6.0``.
 
-.. include:: ../../airflow/providers/github/CHANGELOG.rst
+==================  ==================
+PIP package         Version required
+==================  ==================
+``apache-airflow``  ``>=2.6.0``
+``PyGithub``        ``!=1.58``
+==================  ==================

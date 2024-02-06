@@ -15,6 +15,8 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
+from __future__ import annotations
+
 import datetime
 import json
 import urllib.parse
@@ -32,6 +34,8 @@ from tests.test_utils.api_connexion_utils import create_user_scope
 from tests.test_utils.db import clear_db_runs
 from tests.test_utils.www import check_content_in_response, check_content_not_in_response, client_with_login
 
+pytestmark = pytest.mark.db_test
+
 NEXT_YEAR = datetime.datetime.now().year + 1
 DEFAULT_DATE = timezone.datetime(NEXT_YEAR, 6, 1)
 DEFAULT_RUN_ID = "TEST_RUN_ID"
@@ -39,37 +43,37 @@ USER_DATA = {
     "dag_tester": (
         "dag_acl_tester",
         {
-            "first_name": 'dag_test',
-            "last_name": 'dag_test',
-            "email": 'dag_test@fab.org',
-            "password": 'dag_test',
+            "first_name": "dag_test",
+            "last_name": "dag_test",
+            "email": "dag_test@fab.org",
+            "password": "dag_test",
         },
     ),
     "dag_faker": (  # User without permission.
         "dag_acl_faker",
         {
-            "first_name": 'dag_faker',
-            "last_name": 'dag_faker',
-            "email": 'dag_fake@fab.org',
-            "password": 'dag_faker',
+            "first_name": "dag_faker",
+            "last_name": "dag_faker",
+            "email": "dag_fake@fab.org",
+            "password": "dag_faker",
         },
     ),
     "dag_read_only": (  # User with only read permission.
         "dag_acl_read_only",
         {
-            "first_name": 'dag_read_only',
-            "last_name": 'dag_read_only',
-            "email": 'dag_read_only@fab.org',
-            "password": 'dag_read_only',
+            "first_name": "dag_read_only",
+            "last_name": "dag_read_only",
+            "email": "dag_read_only@fab.org",
+            "password": "dag_read_only",
         },
     ),
     "all_dag_user": (  # User has all dag access.
         "all_dag_role",
         {
-            "first_name": 'all_dag_user',
-            "last_name": 'all_dag_user',
-            "email": 'all_dag_user@fab.org',
-            "password": 'all_dag_user',
+            "first_name": "all_dag_user",
+            "last_name": "all_dag_user",
+            "email": "all_dag_user@fab.org",
+            "password": "all_dag_user",
         },
     ),
 }
@@ -88,27 +92,28 @@ def acl_app(app):
             )
 
     role_permissions = {
-        'dag_acl_tester': [
+        "dag_acl_tester": [
             (permissions.ACTION_CAN_READ, permissions.RESOURCE_WEBSITE),
-            (permissions.ACTION_CAN_EDIT, 'DAG:example_bash_operator'),
-            (permissions.ACTION_CAN_READ, 'DAG:example_bash_operator'),
+            (permissions.ACTION_CAN_EDIT, "DAG:example_bash_operator"),
+            (permissions.ACTION_CAN_READ, "DAG:example_bash_operator"),
         ],
-        'all_dag_role': [
+        "all_dag_role": [
             (permissions.ACTION_CAN_EDIT, permissions.RESOURCE_DAG),
             (permissions.ACTION_CAN_READ, permissions.RESOURCE_DAG),
+            (permissions.ACTION_CAN_READ, permissions.RESOURCE_DAG_RUN),
             (permissions.ACTION_CAN_READ, permissions.RESOURCE_TASK_INSTANCE),
             (permissions.ACTION_CAN_READ, permissions.RESOURCE_WEBSITE),
         ],
-        'User': [
+        "User": [
             (permissions.ACTION_CAN_EDIT, permissions.RESOURCE_DAG),
             (permissions.ACTION_CAN_READ, permissions.RESOURCE_DAG),
             (permissions.ACTION_CAN_READ, permissions.RESOURCE_WEBSITE),
         ],
-        'dag_acl_read_only': [
-            (permissions.ACTION_CAN_READ, 'DAG:example_bash_operator'),
+        "dag_acl_read_only": [
+            (permissions.ACTION_CAN_READ, "DAG:example_bash_operator"),
             (permissions.ACTION_CAN_READ, permissions.RESOURCE_WEBSITE),
         ],
-        'dag_acl_faker': [(permissions.ACTION_CAN_READ, permissions.RESOURCE_WEBSITE)],
+        "dag_acl_faker": [(permissions.ACTION_CAN_READ, permissions.RESOURCE_WEBSITE)],
     }
 
     for _role, _permissions in role_permissions.items():
@@ -119,7 +124,7 @@ def acl_app(app):
 
     yield app
 
-    for username, _ in USER_DATA.items():
+    for username in USER_DATA:
         user = security_manager.find_user(username=username)
         if user:
             security_manager.del_register_user(user)
@@ -178,8 +183,8 @@ def user_edit_one_dag(acl_app):
         username="user_edit_one_dag",
         role_name="role_edit_one_dag",
         permissions=[
-            (permissions.ACTION_CAN_READ, 'DAG:example_bash_operator'),
-            (permissions.ACTION_CAN_EDIT, 'DAG:example_bash_operator'),
+            (permissions.ACTION_CAN_READ, "DAG:example_bash_operator"),
+            (permissions.ACTION_CAN_EDIT, "DAG:example_bash_operator"),
         ],
     ) as user:
         yield user
@@ -188,7 +193,7 @@ def user_edit_one_dag(acl_app):
 @pytest.mark.usefixtures("user_edit_one_dag")
 def test_permission_exist(acl_app):
     perms_views = acl_app.appbuilder.sm.get_resource_permissions(
-        acl_app.appbuilder.sm.get_resource('DAG:example_bash_operator'),
+        acl_app.appbuilder.sm.get_resource("DAG:example_bash_operator"),
     )
     assert len(perms_views) == 3
 
@@ -200,10 +205,10 @@ def test_permission_exist(acl_app):
 
 @pytest.mark.usefixtures("user_edit_one_dag")
 def test_role_permission_associate(acl_app):
-    test_role = acl_app.appbuilder.sm.find_role('role_edit_one_dag')
+    test_role = acl_app.appbuilder.sm.find_role("role_edit_one_dag")
     perms = {str(perm) for perm in test_role.permissions}
-    assert 'can edit on DAG:example_bash_operator' in perms
-    assert 'can read on DAG:example_bash_operator' in perms
+    assert "can edit on DAG:example_bash_operator" in perms
+    assert "can read on DAG:example_bash_operator" in perms
 
 
 @pytest.fixture(scope="module")
@@ -231,24 +236,32 @@ def client_all_dags(acl_app, user_all_dags):
 
 def test_index_for_all_dag_user(client_all_dags):
     # The all dag user can access/view all dags.
-    resp = client_all_dags.get('/', follow_redirects=True)
-    check_content_in_response('example_subdag_operator', resp)
-    check_content_in_response('example_bash_operator', resp)
+    resp = client_all_dags.get("/", follow_redirects=True)
+    check_content_in_response("example_subdag_operator", resp)
+    check_content_in_response("example_bash_operator", resp)
 
 
 def test_index_failure(dag_test_client):
     # This user can only access/view example_bash_operator dag.
-    resp = dag_test_client.get('/', follow_redirects=True)
-    check_content_not_in_response('example_subdag_operator', resp)
+    resp = dag_test_client.get("/", follow_redirects=True)
+    check_content_not_in_response("example_subdag_operator", resp)
 
 
 def test_dag_autocomplete_success(client_all_dags):
     resp = client_all_dags.get(
-        'dagmodel/autocomplete?query=example_bash',
+        "dagmodel/autocomplete?query=flow",
         follow_redirects=False,
     )
-    check_content_in_response('example_bash_operator', resp)
-    check_content_not_in_response('example_subdag_operator', resp)
+    expected = [
+        {"name": "airflow", "type": "owner"},
+        {"name": "example_dynamic_task_mapping_with_no_taskflow_operators", "type": "dag"},
+        {"name": "example_setup_teardown_taskflow", "type": "dag"},
+        {"name": "test_mapped_taskflow", "type": "dag"},
+        {"name": "tutorial_taskflow_api", "type": "dag"},
+        {"name": "tutorial_taskflow_api_virtualenv", "type": "dag"},
+    ]
+
+    assert resp.json == expected
 
 
 @pytest.mark.parametrize(
@@ -291,7 +304,7 @@ def test_dag_autocomplete_status(client_all_dags, status, expected, unexpected):
     with client_all_dags.session_transaction() as flask_session:
         flask_session[FILTER_STATUS_COOKIE] = status
     resp = client_all_dags.get(
-        'dagmodel/autocomplete?query=example_branch_',
+        "dagmodel/autocomplete?query=example_branch_",
         follow_redirects=False,
     )
     check_content_in_response(expected, resp)
@@ -323,20 +336,20 @@ def client_all_dags_dagruns(acl_app, user_all_dags_dagruns):
 
 
 def test_dag_stats_success(client_all_dags_dagruns):
-    resp = client_all_dags_dagruns.post('dag_stats', follow_redirects=True)
-    check_content_in_response('example_bash_operator', resp)
-    assert set(list(resp.json.items())[0][1][0].keys()) == {'state', 'count'}
+    resp = client_all_dags_dagruns.post("dag_stats", follow_redirects=True)
+    check_content_in_response("example_bash_operator", resp)
+    assert set(next(iter(resp.json.items()))[1][0].keys()) == {"state", "count"}
 
 
 def test_task_stats_failure(dag_test_client):
-    resp = dag_test_client.post('task_stats', follow_redirects=True)
-    check_content_not_in_response('example_subdag_operator', resp)
+    resp = dag_test_client.post("task_stats", follow_redirects=True)
+    check_content_not_in_response("example_subdag_operator", resp)
 
 
 def test_dag_stats_success_for_all_dag_user(client_all_dags_dagruns):
-    resp = client_all_dags_dagruns.post('dag_stats', follow_redirects=True)
-    check_content_in_response('example_subdag_operator', resp)
-    check_content_in_response('example_bash_operator', resp)
+    resp = client_all_dags_dagruns.post("dag_stats", follow_redirects=True)
+    check_content_in_response("example_subdag_operator", resp)
+    check_content_in_response("example_bash_operator", resp)
 
 
 @pytest.fixture(scope="module")
@@ -365,9 +378,9 @@ def client_all_dags_dagruns_tis(acl_app, user_all_dags_dagruns_tis):
 
 
 def test_task_stats_empty_success(client_all_dags_dagruns_tis):
-    resp = client_all_dags_dagruns_tis.post('task_stats', follow_redirects=True)
-    check_content_in_response('example_bash_operator', resp)
-    check_content_in_response('example_subdag_operator', resp)
+    resp = client_all_dags_dagruns_tis.post("task_stats", follow_redirects=True)
+    check_content_in_response("example_bash_operator", resp)
+    check_content_in_response("example_subdag_operator", resp)
 
 
 @pytest.mark.parametrize(
@@ -390,7 +403,7 @@ def test_task_stats_success(
     unexpected_dag_ids,
 ):
     resp = client_all_dags_dagruns_tis.post(
-        'task_stats', data={'dag_ids': dags_to_run}, follow_redirects=True
+        "task_stats", data={"dag_ids": dags_to_run}, follow_redirects=True
     )
     assert resp.status_code == 200
     for dag_id in unexpected_dag_ids:
@@ -425,15 +438,15 @@ def client_all_dags_codes(acl_app, user_all_dags_codes):
 
 
 def test_code_success(client_all_dags_codes):
-    url = 'code?dag_id=example_bash_operator'
+    url = "code?dag_id=example_bash_operator"
     resp = client_all_dags_codes.get(url, follow_redirects=True)
-    check_content_in_response('example_bash_operator', resp)
+    check_content_in_response("example_bash_operator", resp)
 
 
 def test_code_failure(dag_test_client):
-    url = 'code?dag_id=example_bash_operator'
+    url = "code?dag_id=example_bash_operator"
     resp = dag_test_client.get(url, follow_redirects=True)
-    check_content_not_in_response('example_bash_operator', resp)
+    check_content_not_in_response("example_bash_operator", resp)
 
 
 @pytest.mark.parametrize(
@@ -441,22 +454,22 @@ def test_code_failure(dag_test_client):
     ["example_bash_operator", "example_subdag_operator"],
 )
 def test_code_success_for_all_dag_user(client_all_dags_codes, dag_id):
-    url = f'code?dag_id={dag_id}'
+    url = f"code?dag_id={dag_id}"
     resp = client_all_dags_codes.get(url, follow_redirects=True)
     check_content_in_response(dag_id, resp)
 
 
 def test_dag_details_success(client_all_dags_dagruns):
     """User without RESOURCE_DAG_CODE can see the page, just not the ID."""
-    url = 'dag_details?dag_id=example_bash_operator'
+    url = "dag_details?dag_id=example_bash_operator"
     resp = client_all_dags_dagruns.get(url, follow_redirects=True)
-    check_content_in_response('DAG Details', resp)
+    check_content_in_response("DAG Details", resp)
 
 
 def test_dag_details_failure(dag_faker_client):
-    url = 'dag_details?dag_id=example_bash_operator'
+    url = "dag_details?dag_id=example_bash_operator"
     resp = dag_faker_client.get(url, follow_redirects=True)
-    check_content_not_in_response('DAG Details', resp)
+    check_content_not_in_response("DAG Details", resp)
 
 
 @pytest.mark.parametrize(
@@ -464,7 +477,7 @@ def test_dag_details_failure(dag_faker_client):
     ["example_bash_operator", "example_subdag_operator"],
 )
 def test_dag_details_success_for_all_dag_user(client_all_dags_dagruns, dag_id):
-    url = f'dag_details?dag_id={dag_id}'
+    url = f"dag_details?dag_id={dag_id}"
     resp = client_all_dags_dagruns.get(url, follow_redirects=True)
     check_content_in_response(dag_id, resp)
 
@@ -477,6 +490,7 @@ def user_all_dags_tis(acl_app):
         role_name="role_all_dags_tis",
         permissions=[
             (permissions.ACTION_CAN_READ, permissions.RESOURCE_DAG),
+            (permissions.ACTION_CAN_READ, permissions.RESOURCE_DAG_RUN),
             (permissions.ACTION_CAN_READ, permissions.RESOURCE_TASK_INSTANCE),
             (permissions.ACTION_CAN_READ, permissions.RESOURCE_WEBSITE),
         ],
@@ -526,6 +540,7 @@ def user_dags_tis_logs(acl_app):
         role_name="role_dags_tis_logs",
         permissions=[
             (permissions.ACTION_CAN_READ, permissions.RESOURCE_DAG),
+            (permissions.ACTION_CAN_READ, permissions.RESOURCE_DAG_RUN),
             (permissions.ACTION_CAN_READ, permissions.RESOURCE_TASK_INSTANCE),
             (permissions.ACTION_CAN_READ, permissions.RESOURCE_TASK_LOG),
             (permissions.ACTION_CAN_READ, permissions.RESOURCE_WEBSITE),
@@ -544,22 +559,22 @@ def client_dags_tis_logs(acl_app, user_dags_tis_logs):
 
 
 RENDERED_TEMPLATES_URL = (
-    f'rendered-templates?task_id=runme_0&dag_id=example_bash_operator&'
-    f'execution_date={urllib.parse.quote_plus(str(DEFAULT_DATE))}'
+    f"rendered-templates?task_id=runme_0&dag_id=example_bash_operator&"
+    f"execution_date={urllib.parse.quote_plus(str(DEFAULT_DATE))}"
 )
 TASK_URL = (
-    f'task?task_id=runme_0&dag_id=example_bash_operator&'
-    f'execution_date={urllib.parse.quote_plus(str(DEFAULT_DATE))}'
+    f"task?task_id=runme_0&dag_id=example_bash_operator&"
+    f"execution_date={urllib.parse.quote_plus(str(DEFAULT_DATE))}"
 )
 XCOM_URL = (
-    f'xcom?task_id=runme_0&dag_id=example_bash_operator&'
-    f'execution_date={urllib.parse.quote_plus(str(DEFAULT_DATE))}'
+    f"xcom?task_id=runme_0&dag_id=example_bash_operator&"
+    f"execution_date={urllib.parse.quote_plus(str(DEFAULT_DATE))}"
 )
 DURATION_URL = "duration?days=30&dag_id=example_bash_operator"
 TRIES_URL = "tries?days=30&dag_id=example_bash_operator"
 LANDING_TIMES_URL = "landing_times?days=30&dag_id=example_bash_operator"
 GANTT_URL = "gantt?dag_id=example_bash_operator"
-TREE_URL = "tree?dag_id=example_bash_operator"
+GRID_DATA_URL = "object/grid_data?dag_id=example_bash_operator"
 LOG_URL = (
     f"log?task_id=runme_0&dag_id=example_bash_operator&"
     f"execution_date={urllib.parse.quote_plus(str(DEFAULT_DATE))}"
@@ -577,8 +592,8 @@ LOG_URL = (
         ("client_all_dags_tis", TRIES_URL, "example_bash_operator"),
         ("client_all_dags_tis", LANDING_TIMES_URL, "example_bash_operator"),
         ("client_all_dags_tis", GANTT_URL, "example_bash_operator"),
-        ("client_dags_tis_logs", TREE_URL, "runme_1"),
-        ("viewer_client", TREE_URL, "runme_1"),
+        ("client_dags_tis_logs", GRID_DATA_URL, "runme_1"),
+        ("viewer_client", GRID_DATA_URL, "runme_1"),
         ("client_dags_tis_logs", LOG_URL, "Log by attempts"),
         ("user_client", LOG_URL, "Log by attempts"),
     ],
@@ -591,8 +606,8 @@ LOG_URL = (
         "tries",
         "landing-times",
         "gantt",
-        "tree-for-readonly-role",
-        "tree-for-viewer",
+        "grid-data-for-readonly-role",
+        "grid-data-for-viewer",
         "log",
         "log-for-user",
     ],
@@ -630,28 +645,20 @@ def test_failure(dag_faker_client, url, unexpected_content):
     check_content_not_in_response(unexpected_content, resp)
 
 
-@pytest.mark.parametrize("client", ["dag_test_client", "all_dag_user_client"])
-def test_run_success(request, client):
-    form = dict(
-        task_id="runme_0",
-        dag_id="example_bash_operator",
-        ignore_all_deps="false",
-        ignore_ti_state="true",
-        execution_date=DEFAULT_DATE,
-    )
-    resp = request.getfixturevalue(client).post('run', data=form)
-    assert resp.status_code == 302
-
-
 def test_blocked_success(client_all_dags_dagruns):
-    resp = client_all_dags_dagruns.post('blocked', follow_redirects=True)
-    check_content_in_response('example_bash_operator', resp)
+    resp = client_all_dags_dagruns.post("blocked")
+    check_content_in_response("example_bash_operator", resp)
 
 
 def test_blocked_success_for_all_dag_user(all_dag_user_client):
-    resp = all_dag_user_client.post('blocked', follow_redirects=True)
-    check_content_in_response('example_bash_operator', resp)
-    check_content_in_response('example_subdag_operator', resp)
+    resp = all_dag_user_client.post("blocked")
+    check_content_in_response("example_bash_operator", resp)
+    check_content_in_response("example_subdag_operator", resp)
+
+
+def test_blocked_viewer(viewer_client):
+    resp = viewer_client.post("blocked")
+    check_content_in_response("example_bash_operator", resp)
 
 
 @pytest.mark.parametrize(
@@ -673,15 +680,11 @@ def test_blocked_success_when_selecting_dags(
     dags_to_block,
     unexpected_dag_ids,
 ):
-    resp = admin_client.post(
-        'blocked',
-        data={'dag_ids': dags_to_block},
-        follow_redirects=True,
-    )
+    resp = admin_client.post("blocked", data={"dag_ids": dags_to_block})
     assert resp.status_code == 200
     for dag_id in unexpected_dag_ids:
         check_content_not_in_response(dag_id, resp)
-    blocked_dags = {blocked['dag_id'] for blocked in json.loads(resp.data.decode())}
+    blocked_dags = {blocked["dag_id"] for blocked in json.loads(resp.data.decode())}
     for dag_id in dags_to_block:
         assert dag_id in blocked_dags
 
@@ -694,6 +697,7 @@ def user_all_dags_edit_tis(acl_app):
         role_name="role_all_dags_edit_tis",
         permissions=[
             (permissions.ACTION_CAN_EDIT, permissions.RESOURCE_DAG),
+            (permissions.ACTION_CAN_EDIT, permissions.RESOURCE_DAG_RUN),
             (permissions.ACTION_CAN_EDIT, permissions.RESOURCE_TASK_INSTANCE),
             (permissions.ACTION_CAN_READ, permissions.RESOURCE_WEBSITE),
         ],
@@ -720,8 +724,8 @@ def test_failed_success(client_all_dags_edit_tis):
         future="false",
         past="false",
     )
-    resp = client_all_dags_edit_tis.post('failed', data=form, follow_redirects=True)
-    check_content_in_response('Marked failed on 1 task instances', resp)
+    resp = client_all_dags_edit_tis.post("failed", data=form, follow_redirects=True)
+    check_content_in_response("Marked failed on 1 task instances", resp)
 
 
 def test_paused_post_success(dag_test_client):
@@ -736,6 +740,7 @@ def user_only_dags_tis(acl_app):
         username="user_only_dags_tis",
         role_name="role_only_dags_tis",
         permissions=[
+            (permissions.ACTION_CAN_READ, permissions.RESOURCE_WEBSITE),
             (permissions.ACTION_CAN_READ, permissions.RESOURCE_DAG),
             (permissions.ACTION_CAN_READ, permissions.RESOURCE_TASK_INSTANCE),
         ],
@@ -756,14 +761,14 @@ def test_success_fail_for_read_only_task_instance_access(client_only_dags_tis):
     form = dict(
         task_id="run_this_last",
         dag_id="example_bash_operator",
-        execution_date=DEFAULT_DATE,
+        dag_run_id=DEFAULT_RUN_ID,
         upstream="false",
         downstream="false",
         future="false",
         past="false",
     )
-    resp = client_only_dags_tis.post('success', data=form)
-    check_content_not_in_response('Wait a minute', resp, resp_code=302)
+    resp = client_only_dags_tis.post("success", data=form)
+    check_content_not_in_response("Wait a minute", resp, resp_code=302)
 
 
 GET_LOGS_WITH_METADATA_URL = (
@@ -844,3 +849,84 @@ def client_anonymous(acl_app):
 def test_no_roles_permissions(request, client, url, status_code, expected_content):
     resp = request.getfixturevalue(client).get(url, follow_redirects=True)
     check_content_in_response(expected_content, resp, status_code)
+
+
+@pytest.fixture(scope="module")
+def user_dag_level_access_with_ti_edit(acl_app):
+    with create_user_scope(
+        acl_app,
+        username="user_dag_level_access_with_ti_edit",
+        role_name="role_dag_level_access_with_ti_edit",
+        permissions=[
+            (permissions.ACTION_CAN_READ, permissions.RESOURCE_WEBSITE),
+            (permissions.ACTION_CAN_READ, permissions.RESOURCE_DAG),
+            (permissions.ACTION_CAN_READ, permissions.RESOURCE_DAG_RUN),
+            (permissions.ACTION_CAN_EDIT, permissions.RESOURCE_DAG_RUN),
+            (permissions.ACTION_CAN_READ, permissions.RESOURCE_TASK_INSTANCE),
+            (permissions.ACTION_CAN_EDIT, permissions.RESOURCE_TASK_INSTANCE),
+            (permissions.ACTION_CAN_EDIT, permissions.resource_name_for_dag("example_bash_operator")),
+        ],
+    ) as user:
+        yield user
+
+
+@pytest.fixture()
+def client_dag_level_access_with_ti_edit(acl_app, user_dag_level_access_with_ti_edit):
+    return client_with_login(
+        acl_app,
+        username="user_dag_level_access_with_ti_edit",
+        password="user_dag_level_access_with_ti_edit",
+    )
+
+
+def test_success_edit_ti_with_dag_level_access_only(client_dag_level_access_with_ti_edit):
+    form = dict(
+        task_id="run_this_last",
+        dag_id="example_bash_operator",
+        dag_run_id=DEFAULT_RUN_ID,
+        upstream="false",
+        downstream="false",
+        future="false",
+        past="false",
+    )
+    resp = client_dag_level_access_with_ti_edit.post("/success", data=form, follow_redirects=True)
+    check_content_in_response("Marked success on 1 task instances", resp)
+
+
+@pytest.fixture(scope="module")
+def user_ti_edit_without_dag_level_access(acl_app):
+    with create_user_scope(
+        acl_app,
+        username="user_ti_edit_without_dag_level_access",
+        role_name="role_ti_edit_without_dag_level_access",
+        permissions=[
+            (permissions.ACTION_CAN_READ, permissions.RESOURCE_WEBSITE),
+            (permissions.ACTION_CAN_READ, permissions.RESOURCE_DAG),
+            (permissions.ACTION_CAN_READ, permissions.RESOURCE_TASK_INSTANCE),
+            (permissions.ACTION_CAN_EDIT, permissions.RESOURCE_TASK_INSTANCE),
+        ],
+    ) as user:
+        yield user
+
+
+@pytest.fixture()
+def client_ti_edit_without_dag_level_access(acl_app, user_ti_edit_without_dag_level_access):
+    return client_with_login(
+        acl_app,
+        username="user_ti_edit_without_dag_level_access",
+        password="user_ti_edit_without_dag_level_access",
+    )
+
+
+def test_failure_edit_ti_without_dag_level_access(client_ti_edit_without_dag_level_access):
+    form = dict(
+        task_id="run_this_last",
+        dag_id="example_bash_operator",
+        dag_run_id=DEFAULT_RUN_ID,
+        upstream="false",
+        downstream="false",
+        future="false",
+        past="false",
+    )
+    resp = client_ti_edit_without_dag_level_access.post("/success", data=form, follow_redirects=True)
+    check_content_not_in_response("Marked success on 1 task instances", resp)

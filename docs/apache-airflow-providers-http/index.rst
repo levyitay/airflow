@@ -19,10 +19,18 @@
 ``apache-airflow-providers-http``
 =================================
 
-Content
--------
 
 .. toctree::
+    :hidden:
+    :maxdepth: 1
+    :caption: Basics
+
+    Home <self>
+    Changelog <changelog>
+    Security <security>
+
+.. toctree::
+    :hidden:
     :maxdepth: 1
     :caption: Guides
 
@@ -30,16 +38,25 @@ Content
     Operators <operators>
 
 .. toctree::
+    :hidden:
     :maxdepth: 1
     :caption: References
 
     Python API <_api/airflow/providers/http/index>
 
 .. toctree::
+    :hidden:
+    :maxdepth: 1
+    :caption: System tests
+
+    System Tests <_api/tests/system/providers/http/index>
+
+.. toctree::
+    :hidden:
     :maxdepth: 1
     :caption: Resources
 
-    Example DAGs <https://github.com/apache/airflow/tree/main/airflow/providers/http/example_dags>
+    Example DAGs <https://github.com/apache/airflow/tree/providers-http/|version|/tests/system/providers/http>
     PyPI Repository <https://pypi.org/project/apache-airflow-providers-http/>
     Installing from sources <installing-providers-from-sources>
 
@@ -47,6 +64,7 @@ Content
 
 
 .. toctree::
+    :hidden:
     :maxdepth: 1
     :caption: Commits
 
@@ -59,7 +77,7 @@ Package apache-airflow-providers-http
 `Hypertext Transfer Protocol (HTTP) <https://www.w3.org/Protocols/>`__
 
 
-Release: 2.1.2
+Release: 4.9.0
 
 Provider package
 ----------------
@@ -70,16 +88,21 @@ are in ``airflow.providers.http`` python package.
 Installation
 ------------
 
-You can install this package on top of an existing Airflow 2.1+ installation via
+You can install this package on top of an existing Airflow 2 installation (see ``Requirements`` below)
+for the minimum Airflow version supported) via
 ``pip install apache-airflow-providers-http``
 
-PIP requirements
-----------------
+Requirements
+------------
 
-=============  ==================
-PIP package    Version required
-=============  ==================
-``requests``   ``>=2.26.0``
-=============  ==================
+The minimum Apache Airflow version supported by this provider package is ``2.6.0``.
 
-.. include:: ../../airflow/providers/http/CHANGELOG.rst
+=====================  ==================
+PIP package            Version required
+=====================  ==================
+``apache-airflow``     ``>=2.6.0``
+``requests``           ``>=2.26.0``
+``requests_toolbelt``
+``aiohttp``
+``asgiref``
+=====================  ==================

@@ -21,11 +21,11 @@
 <!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
 **Table of Contents**  *generated with [DocToc](https://github.com/thlorenz/doctoc)*
 
-- [Apache AirAirflow Breeze](#apache-airairflow-breeze)
+- [Apache Airflow Breeze](#apache-airflow-breeze)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
-Apache AirAirflow Breeze
+Apache Airflow Breeze
 ------------------------
 
 The project is part of [Apache Airflow](https://airflow.apache.org) - it's a development environment
@@ -41,9 +41,23 @@ that might often be needed if dependencies change during development.
 pipx install -e ./dev/breeze --force
 ```
 
-You can read more about Breeze in the [documentation](https://github.com/apache/airflow/blob/main/BREEZE.rst)
+NOTE! If you see below warning - it means that you hit [known issue](https://github.com/pypa/pipx/issues/1092)
+with `packaging` version 23.2
+⚠️ Ignoring --editable install option. pipx disallows it for anything but a local path,
+to avoid having to create a new src/ directory.
 
-This README file contains automatically generated hash of the `setup.py` and `setup.cfg` files that were
+The workaround is to downgrade packaging to 23.1 and re-running the `pipx install` command, for example
+by running `pip install "packaging<23.2"`.
+
+```shell
+pip install "packaging<23.2"
+pipx install -e ./dev/breeze --force
+```
+
+
+You can read more about Breeze in the [documentation](https://github.com/apache/airflow/blob/main/dev/breeze/doc/README.rst)
+
+This README file contains automatically generated hash of the `pyproject.toml` files that were
 available when the package was installed. Since this file becomes part of the installed package, it helps
 to detect automatically if any of the files have changed. If they did, the user will be warned to upgrade
 their installations.
@@ -52,6 +66,6 @@ PLEASE DO NOT MODIFY THE HASH BELOW! IT IS AUTOMATICALLY UPDATED BY PRE-COMMIT.
 
 ---------------------------------------------------------------------------------------------------------
 
-Package config hash: 352a3150dd5b8763de98e99e6dde1271cd35c98df506e091008f50f4c7765ea68eb23005e26af8bc61116bd90777a3c31afd12041890c6df7fd8b518500c08ae
+Package config hash: 0a4cc814e27e822622708d862952a5b411a1a4ad8f3bca8fa591f39ed670ab6636de3caf7c1d072896c411c7eef824f887202b8de8729b8622f2af9b84a154b3
 
 ---------------------------------------------------------------------------------------------------------

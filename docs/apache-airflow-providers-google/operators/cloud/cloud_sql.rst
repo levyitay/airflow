@@ -23,7 +23,7 @@ Google Cloud SQL Operators
 Prerequisite Tasks
 ------------------
 
-.. include::/operators/_partials/prerequisite_tasks.rst
+.. include:: /operators/_partials/prerequisite_tasks.rst
 
 .. _howto/operator:CloudSQLCreateInstanceDatabaseOperator:
 
@@ -42,7 +42,7 @@ Using the operator
 You can create the operator with or without project id. If project id is missing
 it will be retrieved from the Google Cloud connection used. Both variants are shown:
 
-.. exampleinclude:: /../../airflow/providers/google/cloud/example_dags/example_cloud_sql.py
+.. exampleinclude:: /../../tests/system/providers/google/cloud/cloud_sql/example_cloud_sql.py
     :language: python
     :dedent: 4
     :start-after: [START howto_operator_cloudsql_db_create]
@@ -50,7 +50,7 @@ it will be retrieved from the Google Cloud connection used. Both variants are sh
 
 Example request body:
 
-.. exampleinclude:: /../../airflow/providers/google/cloud/example_dags/example_cloud_sql.py
+.. exampleinclude:: /../../tests/system/providers/google/cloud/cloud_sql/example_cloud_sql.py
     :language: python
     :start-after: [START howto_operator_cloudsql_db_create_body]
     :end-before: [END howto_operator_cloudsql_db_create_body]
@@ -87,7 +87,7 @@ Using the operator
 You can create the operator with or without project id. If project id is missing
 it will be retrieved from the Google Cloud connection used. Both variants are shown:
 
-.. exampleinclude:: /../../airflow/providers/google/cloud/example_dags/example_cloud_sql.py
+.. exampleinclude:: /../../tests/system/providers/google/cloud/cloud_sql/example_cloud_sql.py
     :language: python
     :dedent: 4
     :start-after: [START howto_operator_cloudsql_db_delete]
@@ -127,7 +127,7 @@ Using the operator
 You can create the operator with or without project id. If project id is missing
 it will be retrieved from the Google Cloud connection used. Both variants are shown:
 
-.. exampleinclude:: /../../airflow/providers/google/cloud/example_dags/example_cloud_sql.py
+.. exampleinclude:: /../../tests/system/providers/google/cloud/cloud_sql/example_cloud_sql.py
     :language: python
     :dedent: 4
     :start-after: [START howto_operator_cloudsql_db_patch]
@@ -135,7 +135,7 @@ it will be retrieved from the Google Cloud connection used. Both variants are sh
 
 Example request body:
 
-.. exampleinclude:: /../../airflow/providers/google/cloud/example_dags/example_cloud_sql.py
+.. exampleinclude:: /../../tests/system/providers/google/cloud/cloud_sql/example_cloud_sql.py
     :language: python
     :start-after: [START howto_operator_cloudsql_db_patch_body]
     :end-before: [END howto_operator_cloudsql_db_patch_body]
@@ -174,7 +174,7 @@ Using the operator
 You can create the operator with or without project id. If project id is missing
 it will be retrieved from the Google Cloud connection used. Both variants are shown:
 
-.. exampleinclude:: /../../airflow/providers/google/cloud/example_dags/example_cloud_sql.py
+.. exampleinclude:: /../../tests/system/providers/google/cloud/cloud_sql/example_cloud_sql.py
     :language: python
     :dedent: 4
     :start-after: [START howto_operator_cloudsql_delete]
@@ -183,7 +183,7 @@ it will be retrieved from the Google Cloud connection used. Both variants are sh
 Note: If the instance has read or failover replicas you need to delete them before you delete the primary instance.
 Replicas are deleted the same way as primary instances:
 
-.. exampleinclude:: /../../airflow/providers/google/cloud/example_dags/example_cloud_sql.py
+.. exampleinclude:: /../../tests/system/providers/google/cloud/cloud_sql/example_cloud_sql.py
     :language: python
     :dedent: 4
     :start-after: [START howto_operator_cloudsql_replicas_delete]
@@ -224,7 +224,7 @@ Arguments
 
 Example body defining the export operation:
 
-.. exampleinclude:: /../../airflow/providers/google/cloud/example_dags/example_cloud_sql.py
+.. exampleinclude:: /../../tests/system/providers/google/cloud/cloud_sql/example_cloud_sql.py
     :language: python
     :start-after: [START howto_operator_cloudsql_export_body]
     :end-before: [END howto_operator_cloudsql_export_body]
@@ -235,11 +235,19 @@ Using the operator
 You can create the operator with or without project id. If project id is missing
 it will be retrieved from the Google Cloud connection used. Both variants are shown:
 
-.. exampleinclude:: /../../airflow/providers/google/cloud/example_dags/example_cloud_sql.py
+.. exampleinclude:: /../../tests/system/providers/google/cloud/cloud_sql/example_cloud_sql.py
     :language: python
     :dedent: 4
     :start-after: [START howto_operator_cloudsql_export]
     :end-before: [END howto_operator_cloudsql_export]
+
+Also for all this action you can use operator in the deferrable mode:
+
+.. exampleinclude:: /../../tests/system/providers/google/cloud/cloud_sql/example_cloud_sql.py
+    :language: python
+    :dedent: 4
+    :start-after: [START howto_operator_cloudsql_export_async]
+    :end-before: [END howto_operator_cloudsql_export_async]
 
 Templating
 """"""""""
@@ -269,7 +277,7 @@ To grant the service account with the appropriate WRITE permissions for the GCS 
 you can use the :class:`~airflow.providers.google.cloud.operators.gcs.GCSBucketCreateAclEntryOperator`,
 as shown in the example:
 
-.. exampleinclude:: /../../airflow/providers/google/cloud/example_dags/example_cloud_sql.py
+.. exampleinclude:: /../../tests/system/providers/google/cloud/cloud_sql/example_cloud_sql.py
     :language: python
     :dedent: 4
     :start-after: [START howto_operator_cloudsql_export_gcs_permissions]
@@ -278,7 +286,7 @@ as shown in the example:
 
 .. _howto/operator:CloudSQLImportInstanceOperator:
 
-CloudSqlInstanceImportOperator
+CloudSQLImportInstanceOperator
 ------------------------------
 
 Imports data into a Cloud SQL instance from a SQL dump or CSV file in Cloud Storage.
@@ -309,7 +317,7 @@ Arguments
 
 Example body defining the import operation:
 
-.. exampleinclude:: /../../airflow/providers/google/cloud/example_dags/example_cloud_sql.py
+.. exampleinclude:: /../../tests/system/providers/google/cloud/cloud_sql/example_cloud_sql.py
     :language: python
     :start-after: [START howto_operator_cloudsql_import_body]
     :end-before: [END howto_operator_cloudsql_import_body]
@@ -320,7 +328,7 @@ Using the operator
 You can create the operator with or without project id. If project id is missing
 it will be retrieved from the Google Cloud connection used. Both variants are shown:
 
-.. exampleinclude:: /../../airflow/providers/google/cloud/example_dags/example_cloud_sql.py
+.. exampleinclude:: /../../tests/system/providers/google/cloud/cloud_sql/example_cloud_sql.py
     :language: python
     :dedent: 4
     :start-after: [START howto_operator_cloudsql_import]
@@ -354,7 +362,7 @@ To grant the service account with the appropriate READ permissions for the GCS o
 you can use the :class:`~airflow.providers.google.cloud.operators.gcs.GCSBucketCreateAclEntryOperator`,
 as shown in the example:
 
-.. exampleinclude:: /../../airflow/providers/google/cloud/example_dags/example_cloud_sql.py
+.. exampleinclude:: /../../tests/system/providers/google/cloud/cloud_sql/example_cloud_sql.py
     :language: python
     :dedent: 4
     :start-after: [START howto_operator_cloudsql_import_gcs_permissions]
@@ -380,14 +388,14 @@ Arguments
 
 Example body defining the instance with failover replica:
 
-.. exampleinclude:: /../../airflow/providers/google/cloud/example_dags/example_cloud_sql.py
+.. exampleinclude:: /../../tests/system/providers/google/cloud/cloud_sql/example_cloud_sql.py
     :language: python
     :start-after: [START howto_operator_cloudsql_create_body]
     :end-before: [END howto_operator_cloudsql_create_body]
 
 Example body defining read replica for the instance above:
 
-.. exampleinclude:: /../../airflow/providers/google/cloud/example_dags/example_cloud_sql.py
+.. exampleinclude:: /../../tests/system/providers/google/cloud/cloud_sql/example_cloud_sql.py
     :language: python
     :start-after: [START howto_operator_cloudsql_create_replica]
     :end-before: [END howto_operator_cloudsql_create_replica]
@@ -401,7 +409,7 @@ Using the operator
 You can create the operator with or without project id. If project id is missing
 it will be retrieved from the Google Cloud connection used. Both variants are shown:
 
-.. exampleinclude:: /../../airflow/providers/google/cloud/example_dags/example_cloud_sql.py
+.. exampleinclude:: /../../tests/system/providers/google/cloud/cloud_sql/example_cloud_sql.py
     :language: python
     :dedent: 4
     :start-after: [START howto_operator_cloudsql_create]
@@ -441,7 +449,7 @@ Arguments
 
 Example body defining the instance:
 
-.. exampleinclude:: /../../airflow/providers/google/cloud/example_dags/example_cloud_sql.py
+.. exampleinclude:: /../../tests/system/providers/google/cloud/cloud_sql/example_cloud_sql.py
     :language: python
     :start-after: [START howto_operator_cloudsql_patch_body]
     :end-before: [END howto_operator_cloudsql_patch_body]
@@ -452,7 +460,7 @@ Using the operator
 You can create the operator with or without project id. If project id is missing
 it will be retrieved from the Google Cloud connection used. Both variants are shown:
 
-.. exampleinclude:: /../../airflow/providers/google/cloud/example_dags/example_cloud_sql.py
+.. exampleinclude:: /../../tests/system/providers/google/cloud/cloud_sql/example_cloud_sql.py
     :language: python
     :dedent: 4
     :start-after: [START howto_operator_cloudsql_patch]
@@ -472,6 +480,49 @@ More information
 
 See Google Cloud SQL API documentation to `patch an instance
 <https://cloud.google.com/sql/docs/mysql/admin-api/v1beta4/instances/patch>`_.
+
+.. _howto/operator:CloudSQLCloneInstanceOperator:
+
+CloudSQLCloneInstanceOperator
+-----------------------------
+
+Clones an Cloud SQL instance.
+
+For parameter definition, take a look at
+:class:`~airflow.providers.google.cloud.operators.cloud_sql.CloudSQLCloneInstanceOperator`.
+
+Arguments
+"""""""""
+
+For ``clone_context`` object attributes please refer to
+`CloneContext <https://cloud.google.com/sql/docs/mysql/admin-api/rest/v1beta4/instances/clone#clonecontext>`_
+
+Using the operator
+""""""""""""""""""
+
+You can create the operator with or without project id. If project id is missing it will be retrieved from the Google
+Cloud connection used. Both variants are shown:
+
+.. exampleinclude:: /../../tests/system/providers/google/cloud/cloud_sql/example_cloud_sql.py
+    :language: python
+    :dedent: 4
+    :start-after: [START howto_operator_cloudsql_clone]
+    :end-before: [END howto_operator_cloudsql_clone]
+
+Templating
+""""""""""
+
+.. literalinclude:: /../../airflow/providers/google/cloud/operators/cloud_sql.py
+    :language: python
+    :dedent: 4
+    :start-after: [START gcp_sql_clone_template_fields]
+    :end-before: [END gcp_sql_clone_template_fields]
+
+More information
+""""""""""""""""
+
+See Google Cloud SQL API documentation to `clone an instance
+<https://cloud.google.com/sql/docs/mysql/admin-api/rest/v1beta4/instances/clone>`_.
 
 .. _howto/operator:CloudSQLExecuteQueryOperator:
 
@@ -523,13 +574,33 @@ certificate/key files available in predefined locations for all the workers on
 which the operator can run. This can be provided for example by mounting
 NFS-like volumes in the same path for all the workers.
 
-Example connection definitions for all connectivity cases. Note that all the components
-of the connection URI should be URL-encoded:
+Example connection definitions for all non-SSL connectivity cases for Postgres. For connecting to MySQL database
+please use ``mysql`` as a ``database_type``. Note that all the components of the connection URI should be URL-encoded:
+
+.. exampleinclude:: /../../tests/system/providers/google/cloud/cloud_sql/example_cloud_sql_query_postgres.py
+    :language: python
+    :start-after: [START howto_operator_cloudsql_query_connections]
+    :end-before: [END howto_operator_cloudsql_query_connections]
+
+It is also possible to configure a connection via environment variable (note that the connection id from the operator
+matches the :envvar:`AIRFLOW_CONN_{CONN_ID}` postfix uppercase if you are using a standard AIRFLOW notation for
+defining connection via environment variables):
 
 .. exampleinclude:: /../../airflow/providers/google/cloud/example_dags/example_cloud_sql_query.py
     :language: python
     :start-after: [START howto_operator_cloudsql_query_connections]
     :end-before: [END howto_operator_cloudsql_query_connections]
+
+Example operator below is using prepared earlier connection. It might be a connection_id from the Airflow database
+or the connection configured via environment variable (note that the connection id from the operator matches the
+:envvar:`AIRFLOW_CONN_{CONN_ID}` postfix uppercase if you are using a standard AIRFLOW notation for defining connection
+via environment variables):
+
+.. exampleinclude:: /../../tests/system/providers/google/cloud/cloud_sql/example_cloud_sql_query_postgres.py
+    :language: python
+    :start-after: [START howto_operator_cloudsql_query_operators]
+    :end-before: [END howto_operator_cloudsql_query_operators]
+
 
 Using the operator
 """"""""""""""""""

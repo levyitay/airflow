@@ -14,9 +14,9 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
+from __future__ import annotations
 
-import warnings
-from typing import TYPE_CHECKING, Optional, Sequence, Union
+from typing import TYPE_CHECKING, Sequence
 
 from airflow.models import BaseOperator
 from airflow.providers.google.cloud.hooks.gcs import GCSHook
@@ -38,15 +38,10 @@ class GoogleDriveToGCSOperator(BaseOperator):
         file should be written to
     :param object_name: The Google Cloud Storage object name for the object created by the operator.
         For example: ``path/to/my/file/file.txt``.
-    :param destination_bucket: Same as bucket_name, but for backward compatibly
-    :param destination_object: Same as object_name, but for backward compatibly
     :param folder_id: The folder id of the folder in which the Google Drive file resides
     :param file_name: The name of the file residing in Google Drive
     :param drive_id: Optional. The id of the shared Google Drive in which the file resides.
     :param gcp_conn_id: The GCP connection ID to use when fetching connection info.
-    :param delegate_to: The account to impersonate using domain-wide delegation of authority,
-        if any. For this to work, the service account making the request must have
-        domain-wide delegation enabled.
     :param impersonation_chain: Optional service account to impersonate using short-term
         credentials, or chained list of accounts required to get the access_token
         of the last account in the list, which will be impersonated in the request.
@@ -69,52 +64,31 @@ class GoogleDriveToGCSOperator(BaseOperator):
     def __init__(
         self,
         *,
-        bucket_name: Optional[str] = None,
-        object_name: Optional[str] = None,
-        destination_bucket: Optional[str] = None,  # deprecated
-        destination_object: Optional[str] = None,  # deprecated
+        bucket_name: str,
+        object_name: str | None = None,
         file_name: str,
         folder_id: str,
-        drive_id: Optional[str] = None,
+        drive_id: str | None = None,
         gcp_conn_id: str = "google_cloud_default",
-        delegate_to: Optional[str] = None,
-        impersonation_chain: Optional[Union[str, Sequence[str]]] = None,
+        impersonation_chain: str | Sequence[str] | None = None,
         **kwargs,
     ) -> None:
         super().__init__(**kwargs)
-        if destination_bucket:
-            warnings.warn(
-                "`destination_bucket` is deprecated please use `bucket_name`",
-                DeprecationWarning,
-                stacklevel=2,
-            )
-        actual_bucket = destination_bucket or bucket_name
-        if actual_bucket is None:
-            raise RuntimeError("One of the destination_bucket or bucket_name must be set")
-        self.bucket_name: str = actual_bucket
-        self.object_name = destination_object or object_name
-        if destination_object:
-            warnings.warn(
-                "`destination_object` is deprecated please use `object_name`",
-                DeprecationWarning,
-                stacklevel=2,
-            )
+        self.bucket_name = bucket_name
+        self.object_name = object_name
         self.folder_id = folder_id
         self.drive_id = drive_id
         self.file_name = file_name
         self.gcp_conn_id = gcp_conn_id
-        self.delegate_to = delegate_to
         self.impersonation_chain = impersonation_chain
 
-    def execute(self, context: 'Context'):
+    def execute(self, context: Context):
         gdrive_hook = GoogleDriveHook(
             gcp_conn_id=self.gcp_conn_id,
-            delegate_to=self.delegate_to,
             impersonation_chain=self.impersonation_chain,
         )
         gcs_hook = GCSHook(
             gcp_conn_id=self.gcp_conn_id,
-            delegate_to=self.delegate_to,
             impersonation_chain=self.impersonation_chain,
         )
         file_metadata = gdrive_hook.get_file_id(

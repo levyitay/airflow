@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 # Licensed to the Apache Software Foundation (ASF) under one
 # or more contributor license agreements.  See the NOTICE file
 # distributed with this work for additional information
@@ -17,11 +18,11 @@
 # shellcheck shell=bash disable=SC2086
 
 # Installs Airflow from $AIRFLOW_BRANCH tip. This is pure optimisation. It is done because we do not want
-# to reinstall all dependencies from scratch when setup.py changes. Problem with Docker caching is that
+# to reinstall all dependencies from scratch when pyproject.toml changes. Problem with Docker caching is that
 # when a file is changed, when added to docker context, it invalidates the cache and it causes Docker
 # build to reinstall all dependencies from scratch. This can take a loooooot of time. Therefore we install
 # the dependencies first from main (and uninstall airflow right after) so that we can start installing
-# deps from those pre-installed dependencies. It saves few minutes of build time when setup.py changes.
+# deps from those pre-installed dependencies. It saves few minutes of build time when pyproject.toml changes.
 #
 # If INSTALL_MYSQL_CLIENT is set to false, mysql extra is removed
 # If INSTALL_POSTGRES_CLIENT is set to false, postgres extra is removed
@@ -47,12 +48,14 @@ function install_airflow_dependencies_from_branch_tip() {
     fi
     # Install latest set of dependencies using constraints. In case constraints were upgraded and there
     # are conflicts, this might fail, but it should be fixed in the following installation steps
-    pip install \
+    set -x
+    pip install --root-user-action ignore \
+      ${ADDITIONAL_PIP_INSTALL_FLAGS} \
       "https://github.com/${AIRFLOW_REPO}/archive/${AIRFLOW_BRANCH}.tar.gz#egg=apache-airflow[${AIRFLOW_EXTRAS}]" \
       --constraint "${AIRFLOW_CONSTRAINTS_LOCATION}" || true
-    # make sure correct PIP version is used
-    pip install --disable-pip-version-check "pip==${AIRFLOW_PIP_VERSION}"
+    common::install_pip_version
     pip freeze | grep apache-airflow-providers | xargs pip uninstall --yes 2>/dev/null || true
+    set +x
     echo
     echo "${COLOR_BLUE}Uninstalling just airflow. Dependencies remain. Now target airflow can be reinstalled using mostly cached dependencies${COLOR_RESET}"
     echo

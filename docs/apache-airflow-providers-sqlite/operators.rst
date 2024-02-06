@@ -22,7 +22,7 @@
 SqliteOperator
 ==============
 
-Use the :class:`~airflow.providers.sqlite.operators.SqliteOperator` to execute
+Use the :class:`~airflow.providers.sqlite.operators.sqlite.SqliteOperator` to execute
 Sqlite commands in a `Sqlite <https://sqlite.org/lang.html>`__ database.
 
 
@@ -40,25 +40,17 @@ the connection metadata is structured as follows:
      - Input
    * - Host: string
      - Sqlite database file
-   * - Schema: string
-     - Set schema to execute Sql operations on by default
-   * - Login: string
-     - Sqlite user
-   * - Password: string
-     - Sqlite user password
-   * - Port: int
-     - Sqlite port
 
 An example usage of the SqliteOperator is as follows:
 
-.. exampleinclude:: /../../airflow/providers/sqlite/example_dags/example_sqlite.py
+.. exampleinclude:: /../../tests/system/providers/sqlite/example_sqlite.py
     :language: python
     :start-after: [START howto_operator_sqlite]
     :end-before: [END howto_operator_sqlite]
 
 Furthermore, you can use an external file to execute the SQL commands. Script folder must be at the same level as DAG.py file.
 
-.. exampleinclude:: /../../airflow/providers/sqlite/example_dags/example_sqlite.py
+.. exampleinclude:: /../../tests/system/providers/sqlite/example_sqlite.py
     :language: python
     :start-after: [START howto_operator_sqlite_external_file]
     :end-before: [END howto_operator_sqlite_external_file]
